@@ -7,7 +7,11 @@ import {
   getFlagValue,
   removeFlag,
 } from '../../src/mappers/args.js';
-import { getCommandMapping, getCommandsByType } from '../../src/mappers/commands.js';
+import {
+  getCommandMapping,
+  getCommandsByType,
+  getAllCommands,
+} from '../../src/mappers/commands.js';
 
 describe('mapNpmFlagsToPnpm', () => {
   it('should remove --save flag (pnpm default)', () => {
@@ -45,6 +49,11 @@ describe('mapNpmFlagsToPnpm', () => {
     expect(result).toEqual(['--prod']);
   });
 
+  it('should map --no-save to --save=false', () => {
+    const result = mapNpmFlagsToPnpm(['--no-save']);
+    expect(result).toEqual(['--save=false']);
+  });
+
   it('should pass through unknown flags', () => {
     const result = mapNpmFlagsToPnpm(['--custom-flag', 'value']);
     expect(result).toEqual(['--custom-flag', 'value']);
@@ -63,6 +72,16 @@ describe('mapNpmFlagsToPnpm', () => {
   it('should map short flags correctly', () => {
     const result = mapNpmFlagsToPnpm(['-D', '-E', '-g']);
     expect(result).toEqual(['-D', '-E', '-g']);
+  });
+
+  it('should handle sparse arrays with empty strings', () => {
+    const result = mapNpmFlagsToPnpm(['--save-dev', '', '--save-exact']);
+    expect(result).toEqual(['-D', '-E']);
+  });
+
+  it('should map -f to --force', () => {
+    const result = mapNpmFlagsToPnpm(['-f']);
+    expect(result).toEqual(['--force']);
   });
 });
 
@@ -103,10 +122,73 @@ describe('extractPackagesFromArgs', () => {
     expect(result.flags).toEqual(['-D', '--save-exact']);
   });
 
+  it('should keep flag values with flags', () => {
+    const result = extractPackagesFromArgs([
+      '--registry',
+      'https://registry.npmjs.org',
+      'lodash',
+    ]);
+    expect(result.packages).toEqual(['lodash']);
+    expect(result.flags).toEqual(['--registry', 'https://registry.npmjs.org']);
+  });
+
+  it('should treat args after -- as packages', () => {
+    const result = extractPackagesFromArgs(['--', 'lodash', '--flag']);
+    expect(result.packages).toEqual(['lodash', '--flag']);
+    expect(result.flags).toEqual([]);
+  });
+
   it('should handle empty array', () => {
     const result = extractPackagesFromArgs([]);
     expect(result.packages).toEqual([]);
     expect(result.flags).toEqual([]);
+  });
+
+  it('should handle sparse arrays with empty strings', () => {
+    const result = extractPackagesFromArgs(['lodash', '', 'axios']);
+    expect(result.packages).toEqual(['lodash', 'axios']);
+    expect(result.flags).toEqual([]);
+  });
+
+  it('should not consume next arg as value if it starts with dash', () => {
+    const result = extractPackagesFromArgs(['--registry', '--verbose', 'lodash']);
+    expect(result.packages).toEqual(['lodash']);
+    expect(result.flags).toEqual(['--registry', '--verbose']);
+  });
+
+  it('should handle flag with = syntax for value flags', () => {
+    const result = extractPackagesFromArgs(['--registry=https://example.com', 'lodash']);
+    expect(result.packages).toEqual(['lodash']);
+    expect(result.flags).toEqual(['--registry=https://example.com']);
+  });
+
+  it('should handle value flag at end of args', () => {
+    const result = extractPackagesFromArgs(['lodash', '--registry']);
+    expect(result.packages).toEqual(['lodash']);
+    expect(result.flags).toEqual(['--registry']);
+  });
+
+  it('should handle flags before and after --', () => {
+    const result = extractPackagesFromArgs(['-D', '--', '--not-a-flag']);
+    expect(result.packages).toEqual(['--not-a-flag']);
+    expect(result.flags).toEqual(['-D']);
+  });
+
+  it('should handle multiple value flags', () => {
+    const result = extractPackagesFromArgs([
+      '--registry',
+      'https://registry.npmjs.org',
+      '--scope',
+      '@myorg',
+      'lodash',
+    ]);
+    expect(result.packages).toEqual(['lodash']);
+    expect(result.flags).toEqual([
+      '--registry',
+      'https://registry.npmjs.org',
+      '--scope',
+      '@myorg',
+    ]);
   });
 });
 
@@ -192,5 +274,15 @@ describe('getCommandsByType', () => {
     const npmPassthrough = getCommandsByType('npm-passthrough');
     expect(npmPassthrough.some((c) => c.npmCommand === 'token')).toBe(true);
     expect(npmPassthrough.some((c) => c.npmCommand === 'access')).toBe(true);
+  });
+});
+
+describe('getAllCommands', () => {
+  it('should return all command mappings', () => {
+    const commands = getAllCommands();
+    expect(commands.length).toBeGreaterThan(0);
+    expect(commands.some((c) => c.npmCommand === 'install')).toBe(true);
+    expect(commands.some((c) => c.npmCommand === 'run')).toBe(true);
+    expect(commands.some((c) => c.npmCommand === 'publish')).toBe(true);
   });
 });

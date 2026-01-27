@@ -11,7 +11,7 @@ const flagMappings: FlagMapping[] = [
   { npmFlag: '--save-exact', pnpmFlag: '-E' },
   { npmFlag: '--global', pnpmFlag: '-g' },
   { npmFlag: '--production', pnpmFlag: '--prod' },
-  { npmFlag: '--no-save', pnpmFlag: '--save-peer=false' },
+  { npmFlag: '--no-save', pnpmFlag: '--save=false' },
   { npmFlag: '--legacy-peer-deps', pnpmFlag: '--legacy-peer-deps' },
   { npmFlag: '--force', pnpmFlag: '--force' },
   { npmFlag: '--verbose', pnpmFlag: '--reporter=default' },
@@ -39,6 +39,47 @@ const shortFlagMappings: Record<string, string | null> = {
   '-g': '-g',
   '-f': '--force',
 };
+
+const flagsWithValues = new Set([
+  '--access',
+  '--audit-level',
+  '--cache',
+  '--changed-files-ignore-pattern',
+  '--child-concurrency',
+  '--color',
+  '--config',
+  '--cpu',
+  '--cwd',
+  '--depth',
+  '--dir',
+  '--filter',
+  '--global-dir',
+  '--globalconfig',
+  '--hoist-pattern',
+  '--ignore',
+  '--libc',
+  '--lockfile-dir',
+  '--loglevel',
+  '--modules-dir',
+  '--network-concurrency',
+  '--omit',
+  '--os',
+  '--otp',
+  '--prefix',
+  '--public-hoist-pattern',
+  '--publish-branch',
+  '--registry',
+  '--reporter',
+  '--scope',
+  '--store-dir',
+  '--tag',
+  '--test-pattern',
+  '--userconfig',
+  '--virtual-store-dir',
+  '--workspace',
+  '-C',
+  '-w',
+]);
 
 export function mapNpmFlagsToPnpm(args: string[]): string[] {
   const result: string[] = [];
@@ -92,12 +133,30 @@ export function extractPackagesFromArgs(args: string[]): {
   const packages: string[] = [];
   const flags: string[] = [];
 
-  for (const arg of args) {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (!arg) continue;
+
+    if (arg === '--') {
+      packages.push(...args.slice(i + 1));
+      break;
+    }
+
     if (arg.startsWith('-')) {
       flags.push(arg);
-    } else {
-      packages.push(arg);
+      if (
+        !arg.includes('=') &&
+        flagsWithValues.has(arg) &&
+        args[i + 1] &&
+        !args[i + 1]?.startsWith('-')
+      ) {
+        flags.push(args[i + 1] as string);
+        i++;
+      }
+      continue;
     }
+
+    packages.push(arg);
   }
 
   return { packages, flags };

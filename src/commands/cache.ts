@@ -36,7 +36,7 @@ async function cacheList(_args: string[]): Promise<number> {
 }
 
 async function cacheVerify(_args: string[]): Promise<number> {
-  const pnpmArgs = ['store', 'prune'];
+  const pnpmArgs = ['store', 'status'];
   const result = await spawnPnpm(pnpmArgs);
   return result.exitCode ?? 0;
 }

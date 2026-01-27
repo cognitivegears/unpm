@@ -4,8 +4,9 @@ import { getCommandMapping } from './mappers/commands.js';
 import * as commands from './commands/index.js';
 import { passthroughToPnpm, passthroughToNpm } from './commands/passthrough.js';
 import { logger, setLogLevel } from './utils/logger.js';
+import packageJson from '../package.json' assert { type: 'json' };
 
-const VERSION = '0.1.0';
+const VERSION = packageJson.version ?? '0.0.0';
 
 export function createCli(): Command {
   const program = new Command();
