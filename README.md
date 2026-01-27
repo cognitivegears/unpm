@@ -13,6 +13,7 @@ npm's default behavior allows packages to execute arbitrary scripts during insta
 Enter **unpm**. UNPM creates a wrapper around the familiar npm commands, handing the work off to pnpm behind the scenes while adding security improvements:
 
 - **Blocks dependency scripts by default** - Install scripts from dependencies are blocked unless explicitly allowed
+- **Minimum release age protection** - Blocks recently published packages (default: 2 days) to protect against supply chain attacks
 - **Uses pnpm under the hood** - Leverages pnpm's improved dependency resolution and security features
 - **Drop-in npm replacement** - Same commands, same flags, no migration required
 - **LavaMoat integration** - Fine-grained control over which packages can run scripts
@@ -194,6 +195,32 @@ Initialize LavaMoat configuration:
 unpm setup-lavamoat
 ```
 
+### Minimum Release Age
+
+UNPM enforces a minimum release age for packages by default (2 days). This protects against supply chain attacks where malicious packages are published and quickly used before detection.
+
+```bash
+# Install with default 2-day minimum age
+unpm install lodash
+
+# Override minimum release age
+unpm install --min-release-age=4h lodash    # 4 hours
+unpm install --min-release-age=1w lodash    # 1 week
+unpm install --min-release-age=30m lodash   # 30 minutes
+
+# Allow a specific package regardless of age (e.g., for urgent security fix)
+unpm install --allow-recent=critical-fix critical-fix
+
+# Disable minimum release age entirely (not recommended)
+unpm install --no-min-release-age lodash
+```
+
+Duration formats supported:
+- `m` or `min` - minutes (e.g., `30m`)
+- `h`, `hr`, or `hours` - hours (e.g., `4h`)
+- `d` or `days` - days (e.g., `2d`)
+- `w` or `weeks` - weeks (e.g., `1w`)
+
 ## Migrating from npm
 
 UNPM provides a migration command to convert existing npm projects:
@@ -231,6 +258,15 @@ unpm migrate --skip-lavamoat
 | `unpm add <pkg>` | Add a package |
 | `unpm remove <pkg>` | Remove a package |
 | `unpm update` | Update packages |
+
+### Install Security Flags
+
+| Flag | Description |
+|------|-------------|
+| `--min-release-age=<duration>` | Override minimum release age (e.g., `2d`, `4h`, `30m`) |
+| `--allow-recent=<pkg>` | Allow a specific package regardless of age |
+| `--no-min-release-age` | Disable minimum release age check (not recommended) |
+| `--ignore-scripts=false` | Allow all dependency scripts (not recommended) |
 
 ### Run Commands
 
@@ -319,11 +355,14 @@ UNPM automatically translates npm flags to their pnpm equivalents:
 | `--save-exact`, `-E` | `-E` |
 | `--global`, `-g` | `-g` |
 | `--production` | `--prod` |
+| `--no-save` | `--save=false` |
 | `--no-package-lock` | `--no-lockfile` |
 | `--package-lock-only` | `--lockfile-only` |
 | `--ignore-scripts` | `--ignore-scripts` |
 | `--prefer-offline` | `--prefer-offline` |
 | `--dry-run` | `--dry-run` |
+
+Flags that accept values (like `--registry`, `--depth`, `--audit-level`) are automatically handled and passed through correctly.
 
 ## Configuration
 
@@ -334,7 +373,9 @@ UNPM configuration can be added to your `package.json`:
   "unpm": {
     "allowLocalScripts": true,
     "allowDependencyScripts": false,
-    "lavamoatEnabled": true
+    "lavamoatEnabled": true,
+    "minReleaseAge": "2d",
+    "minReleaseAgeExclude": ["trusted-package"]
   },
   "lavamoat": {
     "allowScripts": {
@@ -349,6 +390,8 @@ UNPM configuration can be added to your `package.json`:
 | `allowLocalScripts` | `true` | Allow scripts in your project's package.json |
 | `allowDependencyScripts` | `false` | Allow all dependency scripts (not recommended) |
 | `lavamoatEnabled` | `true` | Use LavaMoat allowlist for script control |
+| `minReleaseAge` | `"2d"` | Minimum age for packages (e.g., `"2d"`, `"4h"`, `"30m"`) |
+| `minReleaseAgeExclude` | `[]` | Packages exempt from minimum release age |
 
 ## Troubleshooting
 

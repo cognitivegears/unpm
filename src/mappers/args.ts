@@ -105,7 +105,8 @@ export function mapNpmFlagsToPnpm(args: string[]): string[] {
     if (flag && Object.prototype.hasOwnProperty.call(shortFlagMappings, flag)) {
       const pnpmFlag = shortFlagMappings[flag] as string | null;
       if (pnpmFlag !== null) {
-        result.push(pnpmFlag);
+        // Preserve value if present (e.g., -C=value)
+        result.push(value ? `${pnpmFlag}=${value}` : pnpmFlag);
       }
       continue;
     }
@@ -163,10 +164,7 @@ export function extractPackagesFromArgs(args: string[]): {
 }
 
 export function hasFlag(args: string[], flag: string): boolean {
-  return args.some(
-    (arg) =>
-      arg === flag || arg.startsWith(`${flag}=`) || arg.startsWith(`${flag} `)
-  );
+  return args.some((arg) => arg === flag || arg.startsWith(`${flag}=`));
 }
 
 export function getFlagValue(args: string[], flag: string): string | undefined {
@@ -187,8 +185,12 @@ export function removeFlag(args: string[], flag: string): string[] {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === flag) {
-      // Also skip the next arg if it's a value
-      if (args[i + 1] && !args[i + 1]?.startsWith('-')) {
+      // Only skip the next arg if this flag is known to take a value
+      if (
+        flagsWithValues.has(flag) &&
+        args[i + 1] &&
+        !args[i + 1]?.startsWith('-')
+      ) {
         i++;
       }
       continue;

@@ -38,7 +38,7 @@ export const logger = {
 
   warn(message: string, ...args: unknown[]): void {
     if (shouldLog('warn')) {
-      console.warn(chalk.yellow(`Warning: ${message}`), ...args);
+      console.warn(message, ...args);
     }
   },
 
