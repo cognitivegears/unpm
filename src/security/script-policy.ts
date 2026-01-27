@@ -71,7 +71,7 @@ export function printScriptBlockedWarning(packageName: string): void {
   console.log('');
 }
 
-export async function getPackagesWithScripts(cwd?: string): Promise<string[]> {
+export async function getPackagesWithScripts(_cwd?: string): Promise<string[]> {
   // This would scan node_modules to find packages with install scripts
   // For now, return empty - will be implemented when needed
   logger.debug('Scanning for packages with install scripts...');

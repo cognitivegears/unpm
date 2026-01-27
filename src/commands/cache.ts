@@ -15,11 +15,12 @@ export async function cache(args: string[]): Promise<number> {
       return cacheList(subArgs);
     case 'verify':
       return cacheVerify(subArgs);
-    default:
+    default: {
       // Pass through to pnpm store
       const pnpmArgs = ['store', ...args];
       const result = await spawnPnpm(pnpmArgs);
       return result.exitCode ?? 0;
+    }
   }
 }
 

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execa } from 'execa';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -221,5 +221,220 @@ describe('CLI Flag Mapping', () => {
       cwd: tempDir,
     });
     expect(result.exitCode).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('CLI Migration', () => {
+  let tempDir: string;
+
+  beforeAll(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'unpm-migrate-'));
+  });
+
+  afterAll(async () => {
+    if (tempDir) {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should fail migration without package.json', async () => {
+    const result = await execa('node', [cliPath, 'migrate', '--dry-run'], {
+      reject: false,
+      cwd: tempDir,
+    });
+    expect(result.exitCode).toBe(1);
+  });
+
+  it('should run migration dry-run with package.json', async () => {
+    await writeFile(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'migrate-test',
+        version: '1.0.0',
+      })
+    );
+
+    const result = await execa('node', [cliPath, 'migrate', '--dry-run'], {
+      reject: false,
+      cwd: tempDir,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('should run migration dry-run with --skip-lavamoat', async () => {
+    const result = await execa(
+      'node',
+      [cliPath, 'migrate', '--dry-run', '--skip-lavamoat'],
+      {
+        reject: false,
+        cwd: tempDir,
+      }
+    );
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('should run migration dry-run with existing package-lock.json', async () => {
+    // Create a minimal package-lock.json
+    await writeFile(
+      join(tempDir, 'package-lock.json'),
+      JSON.stringify({
+        name: 'migrate-test',
+        version: '1.0.0',
+        lockfileVersion: 3,
+        packages: {},
+      })
+    );
+
+    const result = await execa('node', [cliPath, 'migrate', '--dry-run'], {
+      reject: false,
+      cwd: tempDir,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('should run migration dry-run with existing .gitignore', async () => {
+    await writeFile(join(tempDir, '.gitignore'), '# test gitignore\n');
+
+    const result = await execa('node', [cliPath, 'migrate', '--dry-run'], {
+      reject: false,
+      cwd: tempDir,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+});
+
+describe('CLI Allow-Scripts', () => {
+  let tempDir: string;
+
+  beforeAll(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'unpm-allow-'));
+    await writeFile(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'allow-scripts-test',
+        version: '1.0.0',
+      })
+    );
+  });
+
+  afterAll(async () => {
+    if (tempDir) {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should show allow-scripts help', async () => {
+    const result = await execa('node', [cliPath, 'allow-scripts'], {
+      reject: false,
+      cwd: tempDir,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('should list empty allowlist', async () => {
+    const result = await execa('node', [cliPath, 'allow-scripts', 'list'], {
+      reject: false,
+      cwd: tempDir,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('should initialize lavamoat config', async () => {
+    const result = await execa('node', [cliPath, 'allow-scripts', 'init'], {
+      reject: false,
+      cwd: tempDir,
+    });
+    expect(result.exitCode).toBe(0);
+
+    // Verify package.json was updated
+    const pkgContent = await readFile(join(tempDir, 'package.json'), 'utf-8');
+    const pkg = JSON.parse(pkgContent);
+    expect(pkg.lavamoat).toBeDefined();
+  });
+
+  it('should add package to allowlist', async () => {
+    const result = await execa(
+      'node',
+      [cliPath, 'allow-scripts', 'add', 'esbuild'],
+      {
+        reject: false,
+        cwd: tempDir,
+      }
+    );
+    expect(result.exitCode).toBe(0);
+
+    // Verify package.json was updated
+    const pkgContent = await readFile(join(tempDir, 'package.json'), 'utf-8');
+    const pkg = JSON.parse(pkgContent);
+    expect(pkg.lavamoat?.allowScripts?.esbuild).toBe(true);
+  });
+
+  it('should list allowlist with packages', async () => {
+    const result = await execa('node', [cliPath, 'allow-scripts', 'list'], {
+      reject: false,
+      cwd: tempDir,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('should add multiple packages to allowlist', async () => {
+    const result = await execa(
+      'node',
+      [cliPath, 'allow-scripts', 'add', 'sharp', 'node-sass'],
+      {
+        reject: false,
+        cwd: tempDir,
+      }
+    );
+    expect(result.exitCode).toBe(0);
+
+    const pkgContent = await readFile(join(tempDir, 'package.json'), 'utf-8');
+    const pkg = JSON.parse(pkgContent);
+    expect(pkg.lavamoat?.allowScripts?.sharp).toBe(true);
+    expect(pkg.lavamoat?.allowScripts?.['node-sass']).toBe(true);
+  });
+
+  it('should remove package from allowlist', async () => {
+    const result = await execa(
+      'node',
+      [cliPath, 'allow-scripts', 'remove', 'esbuild'],
+      {
+        reject: false,
+        cwd: tempDir,
+      }
+    );
+    expect(result.exitCode).toBe(0);
+
+    const pkgContent = await readFile(join(tempDir, 'package.json'), 'utf-8');
+    const pkg = JSON.parse(pkgContent);
+    expect(pkg.lavamoat?.allowScripts?.esbuild).toBeUndefined();
+  });
+
+  it('should fail add without package name', async () => {
+    const result = await execa('node', [cliPath, 'allow-scripts', 'add'], {
+      reject: false,
+      cwd: tempDir,
+    });
+    expect(result.exitCode).toBe(1);
+  });
+
+  it('should fail remove without package name', async () => {
+    const result = await execa('node', [cliPath, 'allow-scripts', 'remove'], {
+      reject: false,
+      cwd: tempDir,
+    });
+    expect(result.exitCode).toBe(1);
+  });
+
+  it('should fail with unknown subcommand', async () => {
+    const result = await execa(
+      'node',
+      [cliPath, 'allow-scripts', 'unknown-command'],
+      {
+        reject: false,
+        cwd: tempDir,
+      }
+    );
+    expect(result.exitCode).toBe(1);
   });
 });
