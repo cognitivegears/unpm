@@ -147,6 +147,33 @@ unpm explore --allow-explore lodash
 
 In strict mode, `explore` is completely blocked even with `--allow-explore`.
 
+## Unused Dependency Detection
+
+UNPM integrates with [knip](https://knip.dev/) to detect unused dependencies. Unused dependencies increase your attack surface and should be removed.
+
+```bash
+# Check for unused dependencies
+unpm unused
+
+# Remove unused dependencies automatically
+unpm unused --fix
+
+# Full analysis (unused files, exports, types, etc.)
+unpm unused --everything
+
+# Full analysis with automatic fixes
+unpm unused --everything --fix
+```
+
+If knip is installed locally as a dev dependency, UNPM uses it. Otherwise, it runs via `pnpm dlx` automatically—no installation required.
+
+### Why Remove Unused Dependencies?
+
+- **Reduced attack surface**: Each dependency is a potential vector for supply chain attacks
+- **Smaller install size**: Faster CI/CD pipelines and deployments
+- **Cleaner codebase**: Easier to audit and maintain
+- **Security hygiene**: Part of a defense-in-depth strategy
+
 ## LavaMoat Integration
 
 UNPM integrates with [@lavamoat/allow-scripts](https://github.com/LavaMoat/LavaMoat/tree/main/packages/allow-scripts) for managing script permissions. If you already use LavaMoat, UNPM will respect your existing configuration.

@@ -91,6 +91,10 @@ UNPM supports all npm commands. This is a complete reference.
 | `unpm allow-scripts add <pkg>` | Allow package scripts |
 | `unpm allow-scripts list` | List allowed packages |
 | `unpm allow-scripts remove <pkg>` | Remove from allowlist |
+| `unpm unused` | Check for unused dependencies |
+| `unpm unused --fix` | Remove unused dependencies |
+| `unpm unused --everything` | Full analysis (files, exports, types) |
+| `unpm unused --everything --fix` | Full analysis with fixes |
 
 ## Organization Commands
 
