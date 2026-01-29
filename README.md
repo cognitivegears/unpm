@@ -567,7 +567,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-[Apache-2.0](LICENSE)
+[Apache-2.0](LICENSE.md)
 
 ## Related Projects
 
