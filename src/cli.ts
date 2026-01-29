@@ -635,6 +635,14 @@ export function createCli(): Command {
       process.exitCode = await commands.allowScripts(cmd.args);
     });
 
+  program
+    .command('unused')
+    .description('Check for unused dependencies using knip')
+    .allowUnknownOption()
+    .action(async (_opts, cmd) => {
+      process.exitCode = await commands.unused(cmd.args);
+    });
+
   // Fallback handler for any unknown commands
   program.on('command:*', async (operands) => {
     const unknownCommand = operands[0];

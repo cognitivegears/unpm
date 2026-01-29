@@ -17,6 +17,7 @@ import {
   validateStrictModeAction,
   removeStrictFlag,
 } from '../security/strict-mode.js';
+import { validateLockfile } from '../security/lockfile.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -127,6 +128,12 @@ async function getEffectiveReleaseAgeConfig(
 export async function install(args: string[], globalArgs: string[] = []): Promise<number> {
   const allArgs = [...globalArgs, ...args];
 
+  // Validate lockfile status (warn in normal mode, error in strict mode)
+  const lockfileValid = await validateLockfile(allArgs);
+  if (!lockfileValid) {
+    return 1;
+  }
+
   // Extract release age config (with strict mode adjustments)
   const { cleanedArgs, releaseAgeConfig } = await getEffectiveReleaseAgeConfig(allArgs);
 
@@ -192,6 +199,12 @@ export async function install(args: string[], globalArgs: string[] = []): Promis
 export async function ci(args: string[], globalArgs: string[] = []): Promise<number> {
   const allArgs = [...globalArgs, ...args];
 
+  // Validate lockfile status (warn in normal mode, error in strict mode)
+  const lockfileValid = await validateLockfile(allArgs);
+  if (!lockfileValid) {
+    return 1;
+  }
+
   // Extract release age config (with strict mode adjustments)
   const { cleanedArgs, releaseAgeConfig } = await getEffectiveReleaseAgeConfig(allArgs);
 
@@ -253,6 +266,12 @@ export async function ci(args: string[], globalArgs: string[] = []): Promise<num
 export async function add(args: string[], globalArgs: string[] = []): Promise<number> {
   const allArgs = [...globalArgs, ...args];
 
+  // Validate lockfile status (warn in normal mode, error in strict mode)
+  const lockfileValid = await validateLockfile(allArgs);
+  if (!lockfileValid) {
+    return 1;
+  }
+
   // Extract release age config (with strict mode adjustments)
   const { cleanedArgs, releaseAgeConfig } = await getEffectiveReleaseAgeConfig(allArgs);
 
@@ -307,6 +326,12 @@ export async function remove(args: string[]): Promise<number> {
  */
 export async function update(args: string[], globalArgs: string[] = []): Promise<number> {
   const allArgs = [...globalArgs, ...args];
+
+  // Validate lockfile status (warn in normal mode, error in strict mode)
+  const lockfileValid = await validateLockfile(allArgs);
+  if (!lockfileValid) {
+    return 1;
+  }
 
   // Extract release age config (with strict mode adjustments)
   const { cleanedArgs, releaseAgeConfig } = await getEffectiveReleaseAgeConfig(allArgs);

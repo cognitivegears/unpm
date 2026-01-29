@@ -553,3 +553,84 @@ describe('CLI Deprecated Flag Handling', () => {
     expect(result.exitCode).toBeLessThanOrEqual(1);
   });
 });
+
+describe('CLI Unused Command', () => {
+  it('should show help for unused', async () => {
+    const result = await execa('node', [cliPath, 'unused', '--help'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('unused');
+  });
+});
+
+describe('CLI Lockfile Warnings', () => {
+  it('should warn when no lockfile exists', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'unpm-lockfile-'));
+    await writeFile(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'lockfile-test',
+        version: '1.0.0',
+      })
+    );
+
+    const result = await execa('node', [cliPath, 'install', '--dry-run'], {
+      reject: false,
+      cwd: tempDir,
+    });
+
+    // Should still work (warning only) in normal mode
+    expect(result.exitCode).toBeLessThanOrEqual(1);
+
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('should error in strict mode when no lockfile exists', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'unpm-lockfile-strict-'));
+    await writeFile(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'lockfile-strict-test',
+        version: '1.0.0',
+      })
+    );
+
+    const result = await execa('node', [cliPath, 'install', '--strict'], {
+      reject: false,
+      cwd: tempDir,
+    });
+
+    // Should fail in strict mode
+    expect(result.exitCode).toBe(1);
+
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('should error in strict mode when lockfile is in .gitignore', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'unpm-lockfile-gitignore-'));
+    await writeFile(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'lockfile-gitignore-test',
+        version: '1.0.0',
+      })
+    );
+    // Create .git directory to make it a git repo
+    await mkdir(join(tempDir, '.git'), { recursive: true });
+    // Create pnpm-lock.yaml
+    await writeFile(join(tempDir, 'pnpm-lock.yaml'), 'lockfileVersion: 6.0\n');
+    // Create .gitignore with lockfile
+    await writeFile(join(tempDir, '.gitignore'), 'pnpm-lock.yaml\n');
+
+    const result = await execa('node', [cliPath, 'install', '--strict'], {
+      reject: false,
+      cwd: tempDir,
+    });
+
+    // Should fail in strict mode
+    expect(result.exitCode).toBe(1);
+
+    await rm(tempDir, { recursive: true, force: true });
+  });
+});
