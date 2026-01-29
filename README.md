@@ -221,6 +221,66 @@ Duration formats supported:
 - `d` or `days` - days (e.g., `2d`)
 - `w` or `weeks` - weeks (e.g., `1w`)
 
+### Strict Mode
+
+For CI/CD environments and high-security use cases, UNPM provides strict mode which enables additional protections:
+
+```bash
+# Enable via CLI flag
+unpm --strict install
+
+# Enable via environment variable
+UNPM_STRICT=true unpm install
+```
+
+Strict mode enforces:
+- **7-day minimum release age** (instead of 2 days)
+- **dlx is completely blocked** (even with `--allow-dlx`)
+- **explore command is blocked** (even with `--allow-explore`)
+- **--force-scripts is blocked**
+- **Frozen lockfile for ci command**
+
+You can also configure strict mode in `package.json`:
+
+```json
+{
+  "unpm": {
+    "strict": {
+      "enabled": true,
+      "minReleaseAgeDays": 7
+    }
+  }
+}
+```
+
+### dlx Security
+
+The `dlx` command (download and execute) is blocked by default because it can execute arbitrary code from packages:
+
+```bash
+# This will be blocked
+unpm dlx cowsay hello
+
+# To allow dlx, use --allow-dlx
+unpm dlx --allow-dlx cowsay hello
+```
+
+In strict mode, `dlx` is completely blocked even with `--allow-dlx`.
+
+### Explore Command Security
+
+The `explore` command opens a subshell in a package's directory, which is a security risk:
+
+```bash
+# This will be blocked
+unpm explore lodash
+
+# To allow explore, use --allow-explore
+unpm explore --allow-explore lodash
+```
+
+In strict mode, `explore` is completely blocked even with `--allow-explore`.
+
 ## Migrating from npm
 
 UNPM provides a migration command to convert existing npm projects:
@@ -266,7 +326,8 @@ unpm migrate --skip-lavamoat
 | `--min-release-age=<duration>` | Override minimum release age (e.g., `2d`, `4h`, `30m`) |
 | `--allow-recent=<pkg>` | Allow a specific package regardless of age |
 | `--no-min-release-age` | Disable minimum release age check (not recommended) |
-| `--ignore-scripts=false` | Allow all dependency scripts (not recommended) |
+| `--force-scripts` | Allow all dependency scripts to run (not recommended) |
+| `--strict` | Enable strict security mode (7-day release age, block dlx/explore) |
 
 ### Run Commands
 
@@ -278,7 +339,14 @@ unpm migrate --skip-lavamoat
 | `unpm stop` | Stop the application |
 | `unpm restart` | Restart the application |
 | `unpm exec <cmd>` | Execute a command |
-| `unpm dlx <pkg>` | Download and execute a package |
+| `unpm dlx --allow-dlx <pkg>` | Download and execute a package (requires --allow-dlx) |
+
+### Compound Commands
+
+| Command | Description |
+|---------|-------------|
+| `unpm install-test` / `unpm it` | Install packages and run tests |
+| `unpm install-ci-test` / `unpm cit` | CI install and run tests |
 
 ### Package Commands
 
@@ -288,9 +356,12 @@ unpm migrate --skip-lavamoat
 | `unpm publish` | Publish to registry |
 | `unpm unpublish` | Unpublish a package |
 | `unpm deprecate` | Deprecate a package |
+| `unpm undeprecate` | Remove deprecation warning |
 | `unpm pack` | Create a tarball |
 | `unpm link` | Link a package |
 | `unpm unlink` | Unlink a package |
+| `unpm pkg` | Manage package.json fields |
+| `unpm sbom` | Generate software bill of materials |
 
 ### Info Commands
 
@@ -304,6 +375,16 @@ unpm migrate --skip-lavamoat
 | `unpm docs <pkg>` | Open package documentation |
 | `unpm bugs <pkg>` | Open package issues |
 | `unpm repo <pkg>` | Open package repository |
+| `unpm query <selector>` | Query installed packages |
+| `unpm find-dupes` | Find duplicate packages |
+
+### Diagnostic Commands
+
+| Command | Description |
+|---------|-------------|
+| `unpm ping` | Check registry connectivity |
+| `unpm doctor` | Run environment diagnostics |
+| `unpm help-search <term>` | Search help documentation |
 
 ### Security Commands
 
@@ -314,6 +395,15 @@ unpm migrate --skip-lavamoat
 | `unpm allow-scripts add <pkg>` | Allow package scripts |
 | `unpm allow-scripts list` | List allowed packages |
 | `unpm allow-scripts remove <pkg>` | Remove from allowlist |
+
+### Organization Commands
+
+| Command | Description |
+|---------|-------------|
+| `unpm org` | Manage organizations |
+| `unpm team` | Manage organization teams |
+| `unpm profile` | Manage user profile |
+| `unpm hook` | Manage registry hooks |
 
 ### Registry Commands
 
@@ -375,7 +465,11 @@ UNPM configuration can be added to your `package.json`:
     "allowDependencyScripts": false,
     "lavamoatEnabled": true,
     "minReleaseAge": "2d",
-    "minReleaseAgeExclude": ["trusted-package"]
+    "minReleaseAgeExclude": ["trusted-package"],
+    "strict": {
+      "enabled": false,
+      "minReleaseAgeDays": 7
+    }
   },
   "lavamoat": {
     "allowScripts": {
@@ -392,6 +486,8 @@ UNPM configuration can be added to your `package.json`:
 | `lavamoatEnabled` | `true` | Use LavaMoat allowlist for script control |
 | `minReleaseAge` | `"2d"` | Minimum age for packages (e.g., `"2d"`, `"4h"`, `"30m"`) |
 | `minReleaseAgeExclude` | `[]` | Packages exempt from minimum release age |
+| `strict.enabled` | `false` | Enable strict security mode |
+| `strict.minReleaseAgeDays` | `7` | Minimum release age in strict mode (days) |
 
 ## Troubleshooting
 

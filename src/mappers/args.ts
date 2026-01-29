@@ -81,6 +81,63 @@ const flagsWithValues = new Set([
   '-w',
 ]);
 
+/**
+ * Flags that are unpm-specific and should not be passed to pnpm/npm.
+ * These are handled by unpm's security layer.
+ */
+export const unpmOnlyFlags = new Set([
+  '--strict',
+  '--allow-dlx',
+  '--allow-explore',
+  '--force-scripts',
+  '--min-release-age',
+  '--minimum-release-age',
+  '--no-min-release-age',
+  '--no-minimum-release-age',
+  '--allow-recent',
+]);
+
+/**
+ * Check if a flag is unpm-specific and should not be passed to pnpm/npm.
+ */
+export function isUnpmOnlyFlag(flag: string): boolean {
+  // Check exact match
+  if (unpmOnlyFlags.has(flag)) {
+    return true;
+  }
+  // Check flags with values (e.g., --min-release-age=2d)
+  const flagName = flag.split('=')[0];
+  if (flagName && unpmOnlyFlags.has(flagName)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Remove unpm-specific flags from args before passing to pnpm/npm.
+ */
+export function removeUnpmOnlyFlags(args: string[]): string[] {
+  const result: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (!arg) continue;
+
+    if (isUnpmOnlyFlag(arg)) {
+      // Skip this flag and its value if applicable
+      if (!arg.includes('=') && flagsWithValues.has(arg.split('=')[0] ?? '')) {
+        // Skip next arg if it's a value
+        if (args[i + 1] && !args[i + 1]?.startsWith('-')) {
+          i++;
+        }
+      }
+      continue;
+    }
+
+    result.push(arg);
+  }
+  return result;
+}
+
 export function mapNpmFlagsToPnpm(args: string[]): string[] {
   const result: string[] = [];
 

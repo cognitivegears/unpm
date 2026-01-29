@@ -69,6 +69,14 @@ export function formatDuration(minutes: number): string {
   }
 }
 
+/**
+ * Format minutes as a pnpm-compatible duration for --config flag.
+ * Returns numeric minutes since pnpm accepts that without quoting issues.
+ */
+export function formatDurationForPnpm(minutes: number): string {
+  return `${minutes}`;
+}
+
 export interface ReleaseAgeConfig {
   /** Minimum release age in minutes. Set to 0 to disable. */
   minReleaseAge: number;
@@ -103,8 +111,15 @@ export async function getReleaseAgeConfig(cwd?: string): Promise<ReleaseAgeConfi
 }
 
 export interface ReleaseAgeFlagsResult {
-  /** Flags to pass to pnpm */
+  /**
+   * CLI flags to pass to pnpm using --config.minimum-release-age format.
+   * See: https://pnpm.io/blog/releases/10.16
+   */
   flags: string[];
+  /**
+   * @deprecated Environment variables don't work for this setting. Use flags instead.
+   */
+  envVars: Record<string, string>;
   /** Whether min release age is disabled */
   disabled: boolean;
   /** The effective minimum release age in minutes */
@@ -178,22 +193,21 @@ export async function extractReleaseAgeFlags(
     cleanedArgs.push(arg);
   }
 
-  // Build pnpm flags
+  // Build pnpm CLI flags for the setting
+  // Use --config.minimum-release-age="X days" format
+  // See: https://pnpm.io/blog/releases/10.16
   const flags: string[] = [];
 
   if (!disabled && minAgeMinutes > 0) {
-    flags.push(`--minimum-release-age=${minAgeMinutes}`);
-
-    // Add exclusions
-    for (const pkg of excludePackages) {
-      flags.push(`--minimum-release-age-exclude=${pkg}`);
-    }
+    const durationStr = formatDurationForPnpm(minAgeMinutes);
+    flags.push(`--config.minimum-release-age=${durationStr}`);
   }
 
   return {
     cleanedArgs,
     releaseAgeFlags: {
       flags,
+      envVars: {}, // Env vars don't work for this setting
       disabled,
       minAgeMinutes: disabled ? 0 : minAgeMinutes,
     },

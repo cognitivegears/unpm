@@ -11,3 +11,6 @@ export * from './misc.js';
 export * from './migrate.js';
 export * from './allow-scripts.js';
 export * from './passthrough.js';
+export * from './diagnostic.js';
+export * from './org-team.js';
+export * from './package.js';

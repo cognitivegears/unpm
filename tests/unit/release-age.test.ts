@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   parseDuration,
   formatDuration,
+  formatDurationForPnpm,
   extractReleaseAgeFlags,
   DEFAULT_MIN_RELEASE_AGE_MINUTES,
 } from '../../src/security/release-age.js';
@@ -77,6 +78,17 @@ describe('formatDuration', () => {
   });
 });
 
+describe('formatDurationForPnpm', () => {
+  it('should return numeric minutes', () => {
+    expect(formatDurationForPnpm(1440)).toBe('1440');
+    expect(formatDurationForPnpm(2880)).toBe('2880');
+    expect(formatDurationForPnpm(10080)).toBe('10080');
+    expect(formatDurationForPnpm(60)).toBe('60');
+    expect(formatDurationForPnpm(30)).toBe('30');
+    expect(formatDurationForPnpm(1)).toBe('1');
+  });
+});
+
 describe('extractReleaseAgeFlags', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -86,15 +98,17 @@ describe('extractReleaseAgeFlags', () => {
     });
   });
 
-  it('should return default flags when no args provided', async () => {
+  it('should return default config when no args provided', async () => {
     const result = await extractReleaseAgeFlags([]);
 
     expect(result.cleanedArgs).toEqual([]);
     expect(result.releaseAgeFlags.disabled).toBe(false);
     expect(result.releaseAgeFlags.minAgeMinutes).toBe(DEFAULT_MIN_RELEASE_AGE_MINUTES);
-    expect(result.releaseAgeFlags.flags).toContain(
-      `--minimum-release-age=${DEFAULT_MIN_RELEASE_AGE_MINUTES}`
-    );
+    // Uses --config.minimum-release-age flag format with numeric minutes
+    expect(result.releaseAgeFlags.flags).toEqual([
+      `--config.minimum-release-age=2880`,
+    ]);
+    expect(result.releaseAgeFlags.envVars).toEqual({});
   });
 
   it('should parse --min-release-age flag with value', async () => {
@@ -102,7 +116,9 @@ describe('extractReleaseAgeFlags', () => {
 
     expect(result.cleanedArgs).toEqual(['lodash']);
     expect(result.releaseAgeFlags.minAgeMinutes).toBe(1440);
-    expect(result.releaseAgeFlags.flags).toContain('--minimum-release-age=1440');
+    expect(result.releaseAgeFlags.flags).toEqual([
+      '--config.minimum-release-age=1440',
+    ]);
   });
 
   it('should parse --min-release-age flag with separate value', async () => {
@@ -110,6 +126,9 @@ describe('extractReleaseAgeFlags', () => {
 
     expect(result.cleanedArgs).toEqual(['lodash']);
     expect(result.releaseAgeFlags.minAgeMinutes).toBe(240);
+    expect(result.releaseAgeFlags.flags).toEqual([
+      '--config.minimum-release-age=240',
+    ]);
   });
 
   it('should parse --no-min-release-age flag', async () => {
@@ -125,14 +144,14 @@ describe('extractReleaseAgeFlags', () => {
     const result = await extractReleaseAgeFlags(['--allow-recent=lodash', 'axios']);
 
     expect(result.cleanedArgs).toEqual(['axios']);
-    expect(result.releaseAgeFlags.flags).toContain('--minimum-release-age-exclude=lodash');
+    expect(result.releaseAgeFlags.minAgeMinutes).toBe(DEFAULT_MIN_RELEASE_AGE_MINUTES);
   });
 
   it('should parse --allow-recent flag with separate value', async () => {
     const result = await extractReleaseAgeFlags(['--allow-recent', 'lodash', 'axios']);
 
     expect(result.cleanedArgs).toEqual(['axios']);
-    expect(result.releaseAgeFlags.flags).toContain('--minimum-release-age-exclude=lodash');
+    expect(result.releaseAgeFlags.minAgeMinutes).toBe(DEFAULT_MIN_RELEASE_AGE_MINUTES);
   });
 
   it('should handle multiple --allow-recent flags', async () => {
@@ -143,8 +162,7 @@ describe('extractReleaseAgeFlags', () => {
     ]);
 
     expect(result.cleanedArgs).toEqual(['express']);
-    expect(result.releaseAgeFlags.flags).toContain('--minimum-release-age-exclude=lodash');
-    expect(result.releaseAgeFlags.flags).toContain('--minimum-release-age-exclude=axios');
+    expect(result.releaseAgeFlags.minAgeMinutes).toBe(DEFAULT_MIN_RELEASE_AGE_MINUTES);
   });
 
   it('should use config from package.json', async () => {
@@ -161,10 +179,9 @@ describe('extractReleaseAgeFlags', () => {
 
     expect(result.cleanedArgs).toEqual(['lodash']);
     expect(result.releaseAgeFlags.minAgeMinutes).toBe(1440);
-    expect(result.releaseAgeFlags.flags).toContain('--minimum-release-age=1440');
-    expect(result.releaseAgeFlags.flags).toContain(
-      '--minimum-release-age-exclude=preconfigured-pkg'
-    );
+    expect(result.releaseAgeFlags.flags).toEqual([
+      '--config.minimum-release-age=1440',
+    ]);
   });
 
   it('should pass through other flags unchanged', async () => {

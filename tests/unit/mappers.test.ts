@@ -6,6 +6,8 @@ import {
   hasFlag,
   getFlagValue,
   removeFlag,
+  isUnpmOnlyFlag,
+  removeUnpmOnlyFlags,
 } from '../../src/mappers/args.js';
 import {
   getCommandMapping,
@@ -284,5 +286,94 @@ describe('getAllCommands', () => {
     expect(commands.some((c) => c.npmCommand === 'install')).toBe(true);
     expect(commands.some((c) => c.npmCommand === 'run')).toBe(true);
     expect(commands.some((c) => c.npmCommand === 'publish')).toBe(true);
+  });
+
+  it('should include new commands', () => {
+    const commands = getAllCommands();
+    expect(commands.some((c) => c.npmCommand === 'ping')).toBe(true);
+    expect(commands.some((c) => c.npmCommand === 'doctor')).toBe(true);
+    expect(commands.some((c) => c.npmCommand === 'sbom')).toBe(true);
+    expect(commands.some((c) => c.npmCommand === 'explore')).toBe(true);
+    expect(commands.some((c) => c.npmCommand === 'install-test')).toBe(true);
+    expect(commands.some((c) => c.npmCommand === 'install-ci-test')).toBe(true);
+    expect(commands.some((c) => c.npmCommand === 'undeprecate')).toBe(true);
+  });
+});
+
+describe('isUnpmOnlyFlag', () => {
+  it('should return true for --strict', () => {
+    expect(isUnpmOnlyFlag('--strict')).toBe(true);
+  });
+
+  it('should return true for --allow-dlx', () => {
+    expect(isUnpmOnlyFlag('--allow-dlx')).toBe(true);
+  });
+
+  it('should return true for --allow-explore', () => {
+    expect(isUnpmOnlyFlag('--allow-explore')).toBe(true);
+  });
+
+  it('should return true for --force-scripts', () => {
+    expect(isUnpmOnlyFlag('--force-scripts')).toBe(true);
+  });
+
+  it('should return true for --min-release-age with value', () => {
+    expect(isUnpmOnlyFlag('--min-release-age=2d')).toBe(true);
+  });
+
+  it('should return true for --no-min-release-age', () => {
+    expect(isUnpmOnlyFlag('--no-min-release-age')).toBe(true);
+  });
+
+  it('should return true for --allow-recent', () => {
+    expect(isUnpmOnlyFlag('--allow-recent')).toBe(true);
+  });
+
+  it('should return false for regular flags', () => {
+    expect(isUnpmOnlyFlag('--save-dev')).toBe(false);
+    expect(isUnpmOnlyFlag('--production')).toBe(false);
+    expect(isUnpmOnlyFlag('-D')).toBe(false);
+  });
+});
+
+describe('removeUnpmOnlyFlags', () => {
+  it('should remove --strict flag', () => {
+    const result = removeUnpmOnlyFlags(['--strict', 'package', '--dev']);
+    expect(result).toEqual(['package', '--dev']);
+  });
+
+  it('should remove --allow-dlx flag', () => {
+    const result = removeUnpmOnlyFlags(['--allow-dlx', 'cowsay']);
+    expect(result).toEqual(['cowsay']);
+  });
+
+  it('should remove --force-scripts flag', () => {
+    const result = removeUnpmOnlyFlags(['--force-scripts', '--save-dev']);
+    expect(result).toEqual(['--save-dev']);
+  });
+
+  it('should remove --min-release-age with value', () => {
+    const result = removeUnpmOnlyFlags(['--min-release-age=7d', 'package']);
+    expect(result).toEqual(['package']);
+  });
+
+  it('should preserve regular npm flags', () => {
+    const result = removeUnpmOnlyFlags(['--save-dev', '--strict', '--production']);
+    expect(result).toEqual(['--save-dev', '--production']);
+  });
+
+  it('should handle empty array', () => {
+    const result = removeUnpmOnlyFlags([]);
+    expect(result).toEqual([]);
+  });
+
+  it('should remove multiple unpm flags', () => {
+    const result = removeUnpmOnlyFlags([
+      '--strict',
+      '--allow-dlx',
+      '--force-scripts',
+      'package',
+    ]);
+    expect(result).toEqual(['package']);
   });
 });

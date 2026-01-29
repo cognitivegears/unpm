@@ -1,3 +1,4 @@
+import chalk from 'chalk';
 import { spawnPnpm } from '../utils/exec.js';
 import { mapNpmFlagsToPnpm, mapNpmCiToPnpm, extractPackagesFromArgs } from '../mappers/args.js';
 import {
@@ -8,43 +9,149 @@ import {
 import {
   extractReleaseAgeFlags,
   formatDuration,
+  type ReleaseAgeFlagsResult,
 } from '../security/release-age.js';
+import {
+  isStrictMode,
+  getStrictModeConfig,
+  validateStrictModeAction,
+  removeStrictFlag,
+} from '../security/strict-mode.js';
 import { logger } from '../utils/logger.js';
+
+/**
+ * Check for deprecated script bypass flags and handle --force-scripts.
+ *
+ * Returns:
+ * - { allowed: true, forceScripts: boolean } if the command should proceed
+ * - { allowed: false } if the command should be blocked
+ */
+async function handleScriptFlags(
+  flags: string[],
+  allArgs: string[]
+): Promise<{ allowed: boolean; forceScripts: boolean; reason?: string }> {
+  // Check for deprecated flags
+  const hasDeprecatedBypass = flags.some(
+    (f) => f === '--ignore-scripts=false' || f === '--no-ignore-scripts'
+  );
+
+  if (hasDeprecatedBypass) {
+    logger.warn('');
+    logger.warn(
+      chalk.yellow('  Warning: --ignore-scripts=false and --no-ignore-scripts are deprecated.')
+    );
+    logger.warn('');
+    logger.warn('  To enable dependency scripts, use:');
+    logger.warn(chalk.cyan('    unpm install --force-scripts'));
+    logger.warn('');
+    logger.warn(chalk.dim('  This flag was ignored. Scripts remain blocked.'));
+    logger.warn('');
+  }
+
+  // Check for --force-scripts
+  const hasForceScripts = flags.includes('--force-scripts');
+
+  if (hasForceScripts) {
+    // Validate against strict mode
+    const validation = await validateStrictModeAction('force-scripts', allArgs);
+    if (!validation.allowed) {
+      logger.error('');
+      logger.error(chalk.red('  Error: --force-scripts is blocked in strict mode.'));
+      logger.error('');
+      logger.error(chalk.dim(`  ${validation.reason}`));
+      logger.error('');
+      return { allowed: false, forceScripts: false, reason: validation.reason };
+    }
+
+    logger.warn('');
+    logger.warn(chalk.yellow('  Warning: --force-scripts enabled. Dependency scripts will run.'));
+    logger.warn(chalk.dim('  Only use this flag if you trust all dependencies.'));
+    logger.warn('');
+    return { allowed: true, forceScripts: true };
+  }
+
+  return { allowed: true, forceScripts: false };
+}
+
+/**
+ * Remove unpm-only flags from the args before passing to pnpm.
+ */
+function removeUnpmFlags(args: string[]): string[] {
+  return args.filter((arg) =>
+    arg !== '--force-scripts' &&
+    arg !== '--ignore-scripts=false' &&
+    arg !== '--no-ignore-scripts' &&
+    arg !== '--strict' &&
+    arg !== '--allow-dlx' &&
+    arg !== '--allow-explore'
+  );
+}
+
+/**
+ * Get release age settings, potentially adjusted for strict mode.
+ * Returns CLI flags to pass to pnpm for minimum-release-age setting.
+ */
+async function getEffectiveReleaseAgeConfig(
+  args: string[],
+  cwd?: string
+): Promise<{ cleanedArgs: string[]; releaseAgeConfig: ReleaseAgeFlagsResult }> {
+  const strictConfig = await getStrictModeConfig(args, cwd);
+  let { cleanedArgs, releaseAgeFlags } = await extractReleaseAgeFlags(args, cwd);
+
+  // In strict mode, enforce minimum 7 days if not explicitly disabled
+  if (strictConfig.enabled && !releaseAgeFlags.disabled) {
+    const strictMinAge = strictConfig.minReleaseAgeDays * 24 * 60; // Convert days to minutes
+    if (releaseAgeFlags.minAgeMinutes < strictMinAge) {
+      const { formatDurationForPnpm } = await import('../security/release-age.js');
+      const durationStr = formatDurationForPnpm(strictMinAge);
+      releaseAgeFlags = {
+        ...releaseAgeFlags,
+        minAgeMinutes: strictMinAge,
+        flags: [`--config.minimum-release-age=${durationStr}`],
+        envVars: {},
+      };
+      logger.debug(`Strict mode: Enforcing minimum release age of ${strictConfig.minReleaseAgeDays} days`);
+    }
+  }
+
+  return { cleanedArgs, releaseAgeConfig: releaseAgeFlags };
+}
 
 /**
  * Install dependencies with security protections.
  * - Always runs pnpm with --ignore-scripts to block dependency scripts
- * - Enforces minimum release age for packages (default: 2 days)
+ * - Enforces minimum release age for packages (default: 2 days, 7 days in strict mode)
  * - Runs local package scripts (preinstall, postinstall, etc.) after installation
  * - Runs scripts for packages in the allowlist
  */
-export async function install(args: string[]): Promise<number> {
-  // Extract release age flags first
-  const { cleanedArgs, releaseAgeFlags } = await extractReleaseAgeFlags(args);
+export async function install(args: string[], globalArgs: string[] = []): Promise<number> {
+  const allArgs = [...globalArgs, ...args];
+
+  // Extract release age config (with strict mode adjustments)
+  const { cleanedArgs, releaseAgeConfig } = await getEffectiveReleaseAgeConfig(allArgs);
 
   const { packages, flags } = extractPackagesFromArgs(cleanedArgs);
-  let mappedFlags = mapNpmFlagsToPnpm(flags);
 
-  // Check if user explicitly wants scripts
-  const userWantsScripts = flags.some(
-    (f) => f === '--ignore-scripts=false' || f === '--no-ignore-scripts'
-  );
+  // Handle script flags
+  const scriptResult = await handleScriptFlags(flags, allArgs);
+  if (!scriptResult.allowed) {
+    return 1;
+  }
 
-  // Always add --ignore-scripts unless user explicitly opts out
-  if (!userWantsScripts && !mappedFlags.includes('--ignore-scripts')) {
+  let mappedFlags = mapNpmFlagsToPnpm(removeUnpmFlags(flags));
+
+  // Always add --ignore-scripts unless --force-scripts was used
+  if (!scriptResult.forceScripts && !mappedFlags.includes('--ignore-scripts')) {
     mappedFlags = [...getSecurityFlags(), ...mappedFlags];
   }
 
-  // Add release age flags
-  mappedFlags = [...releaseAgeFlags.flags, ...mappedFlags];
-
   // Log security info
-  if (releaseAgeFlags.minAgeMinutes > 0) {
-    logger.debug(`Minimum release age: ${formatDuration(releaseAgeFlags.minAgeMinutes)}`);
+  if (releaseAgeConfig.minAgeMinutes > 0) {
+    logger.debug(`Minimum release age: ${formatDuration(releaseAgeConfig.minAgeMinutes)}`);
   }
 
   // Run preinstall scripts from local package.json
-  if (!userWantsScripts) {
+  if (!scriptResult.forceScripts) {
     try {
       await runLocalScripts('preinstall');
     } catch (error) {
@@ -53,8 +160,8 @@ export async function install(args: string[]): Promise<number> {
     }
   }
 
-  // Run pnpm install
-  const pnpmArgs = ['install', ...packages, ...mappedFlags];
+  // Run pnpm install with release age flags
+  const pnpmArgs = ['install', ...packages, ...removeStrictFlag(mappedFlags), ...releaseAgeConfig.flags];
   const result = await spawnPnpm(pnpmArgs);
 
   if (result.exitCode !== 0) {
@@ -62,7 +169,7 @@ export async function install(args: string[]): Promise<number> {
   }
 
   // Run postinstall scripts from local package.json and allowed packages
-  if (!userWantsScripts) {
+  if (!scriptResult.forceScripts) {
     try {
       // Run scripts for allowed dependency packages
       await runAllowedPackageScripts();
@@ -80,28 +187,36 @@ export async function install(args: string[]): Promise<number> {
 
 /**
  * CI install - frozen lockfile with security protections.
+ * In strict mode, always uses --frozen-lockfile.
  */
-export async function ci(args: string[]): Promise<number> {
-  // Extract release age flags first
-  const { cleanedArgs, releaseAgeFlags } = await extractReleaseAgeFlags(args);
+export async function ci(args: string[], globalArgs: string[] = []): Promise<number> {
+  const allArgs = [...globalArgs, ...args];
 
-  let mappedArgs = mapNpmCiToPnpm(cleanedArgs);
+  // Extract release age config (with strict mode adjustments)
+  const { cleanedArgs, releaseAgeConfig } = await getEffectiveReleaseAgeConfig(allArgs);
 
-  // Check if user explicitly wants scripts
-  const userWantsScripts = cleanedArgs.some(
-    (f) => f === '--ignore-scripts=false' || f === '--no-ignore-scripts'
-  );
+  // Handle script flags
+  const { flags } = extractPackagesFromArgs(cleanedArgs);
+  const scriptResult = await handleScriptFlags(flags, allArgs);
+  if (!scriptResult.allowed) {
+    return 1;
+  }
 
-  // Always add --ignore-scripts unless user explicitly opts out
-  if (!userWantsScripts && !mappedArgs.includes('--ignore-scripts')) {
+  let mappedArgs = mapNpmCiToPnpm(removeUnpmFlags(cleanedArgs));
+
+  // Always add --ignore-scripts unless --force-scripts was used
+  if (!scriptResult.forceScripts && !mappedArgs.includes('--ignore-scripts')) {
     mappedArgs = [...getSecurityFlags(), ...mappedArgs];
   }
 
-  // Add release age flags
-  mappedArgs = [...releaseAgeFlags.flags, ...mappedArgs];
+  // In strict mode, ensure frozen lockfile (mapNpmCiToPnpm already adds it, but double-check)
+  const strictMode = await isStrictMode(allArgs);
+  if (strictMode && !mappedArgs.includes('--frozen-lockfile')) {
+    mappedArgs.push('--frozen-lockfile');
+  }
 
   // Run preinstall scripts from local package.json
-  if (!userWantsScripts) {
+  if (!scriptResult.forceScripts) {
     try {
       await runLocalScripts('preinstall');
     } catch (error) {
@@ -110,8 +225,8 @@ export async function ci(args: string[]): Promise<number> {
     }
   }
 
-  // Run pnpm install with frozen lockfile
-  const pnpmArgs = ['install', ...mappedArgs];
+  // Run pnpm install with frozen lockfile and release age flags
+  const pnpmArgs = ['install', ...removeStrictFlag(mappedArgs), ...releaseAgeConfig.flags];
   const result = await spawnPnpm(pnpmArgs);
 
   if (result.exitCode !== 0) {
@@ -119,7 +234,7 @@ export async function ci(args: string[]): Promise<number> {
   }
 
   // Run postinstall scripts
-  if (!userWantsScripts) {
+  if (!scriptResult.forceScripts) {
     try {
       await runAllowedPackageScripts();
       await runLocalScripts('postinstall');
@@ -135,28 +250,29 @@ export async function ci(args: string[]): Promise<number> {
 /**
  * Add packages with security protections.
  */
-export async function add(args: string[]): Promise<number> {
-  // Extract release age flags first
-  const { cleanedArgs, releaseAgeFlags } = await extractReleaseAgeFlags(args);
+export async function add(args: string[], globalArgs: string[] = []): Promise<number> {
+  const allArgs = [...globalArgs, ...args];
+
+  // Extract release age config (with strict mode adjustments)
+  const { cleanedArgs, releaseAgeConfig } = await getEffectiveReleaseAgeConfig(allArgs);
 
   const { packages, flags } = extractPackagesFromArgs(cleanedArgs);
-  let mappedFlags = mapNpmFlagsToPnpm(flags);
 
-  // Check if user explicitly wants scripts
-  const userWantsScripts = flags.some(
-    (f) => f === '--ignore-scripts=false' || f === '--no-ignore-scripts'
-  );
+  // Handle script flags
+  const scriptResult = await handleScriptFlags(flags, allArgs);
+  if (!scriptResult.allowed) {
+    return 1;
+  }
 
-  // Always add --ignore-scripts unless user explicitly opts out
-  if (!userWantsScripts && !mappedFlags.includes('--ignore-scripts')) {
+  let mappedFlags = mapNpmFlagsToPnpm(removeUnpmFlags(flags));
+
+  // Always add --ignore-scripts unless --force-scripts was used
+  if (!scriptResult.forceScripts && !mappedFlags.includes('--ignore-scripts')) {
     mappedFlags = [...getSecurityFlags(), ...mappedFlags];
   }
 
-  // Add release age flags
-  mappedFlags = [...releaseAgeFlags.flags, ...mappedFlags];
-
-  // Run pnpm add
-  const pnpmArgs = ['add', ...packages, ...mappedFlags];
+  // Run pnpm add with release age flags
+  const pnpmArgs = ['add', ...packages, ...removeStrictFlag(mappedFlags), ...releaseAgeConfig.flags];
   const result = await spawnPnpm(pnpmArgs);
 
   if (result.exitCode !== 0) {
@@ -164,7 +280,7 @@ export async function add(args: string[]): Promise<number> {
   }
 
   // Run scripts for allowed packages
-  if (!userWantsScripts) {
+  if (!scriptResult.forceScripts) {
     try {
       await runAllowedPackageScripts();
     } catch (error) {
@@ -180,8 +296,8 @@ export async function add(args: string[]): Promise<number> {
  * Remove packages.
  */
 export async function remove(args: string[]): Promise<number> {
-  const mappedArgs = mapNpmFlagsToPnpm(args);
-  const pnpmArgs = ['remove', ...mappedArgs];
+  const mappedArgs = mapNpmFlagsToPnpm(removeUnpmFlags(args));
+  const pnpmArgs = ['remove', ...removeStrictFlag(mappedArgs)];
   const result = await spawnPnpm(pnpmArgs);
   return result.exitCode ?? 0;
 }
@@ -189,27 +305,28 @@ export async function remove(args: string[]): Promise<number> {
 /**
  * Update packages with security protections.
  */
-export async function update(args: string[]): Promise<number> {
-  // Extract release age flags first
-  const { cleanedArgs, releaseAgeFlags } = await extractReleaseAgeFlags(args);
+export async function update(args: string[], globalArgs: string[] = []): Promise<number> {
+  const allArgs = [...globalArgs, ...args];
 
-  let mappedArgs = mapNpmFlagsToPnpm(cleanedArgs);
+  // Extract release age config (with strict mode adjustments)
+  const { cleanedArgs, releaseAgeConfig } = await getEffectiveReleaseAgeConfig(allArgs);
 
-  // Check if user explicitly wants scripts
-  const userWantsScripts = cleanedArgs.some(
-    (f) => f === '--ignore-scripts=false' || f === '--no-ignore-scripts'
-  );
+  // Handle script flags
+  const { flags } = extractPackagesFromArgs(cleanedArgs);
+  const scriptResult = await handleScriptFlags(flags, allArgs);
+  if (!scriptResult.allowed) {
+    return 1;
+  }
 
-  // Always add --ignore-scripts unless user explicitly opts out
-  if (!userWantsScripts && !mappedArgs.includes('--ignore-scripts')) {
+  let mappedArgs = mapNpmFlagsToPnpm(removeUnpmFlags(cleanedArgs));
+
+  // Always add --ignore-scripts unless --force-scripts was used
+  if (!scriptResult.forceScripts && !mappedArgs.includes('--ignore-scripts')) {
     mappedArgs = [...getSecurityFlags(), ...mappedArgs];
   }
 
-  // Add release age flags
-  mappedArgs = [...releaseAgeFlags.flags, ...mappedArgs];
-
-  // Run pnpm update
-  const pnpmArgs = ['update', ...mappedArgs];
+  // Run pnpm update with release age flags
+  const pnpmArgs = ['update', ...removeStrictFlag(mappedArgs), ...releaseAgeConfig.flags];
   const result = await spawnPnpm(pnpmArgs);
 
   if (result.exitCode !== 0) {
@@ -217,7 +334,7 @@ export async function update(args: string[]): Promise<number> {
   }
 
   // Run scripts for allowed packages
-  if (!userWantsScripts) {
+  if (!scriptResult.forceScripts) {
     try {
       await runAllowedPackageScripts();
     } catch (error) {
@@ -227,4 +344,32 @@ export async function update(args: string[]): Promise<number> {
   }
 
   return 0;
+}
+
+/**
+ * Install packages and then run tests.
+ * Equivalent to: npm install && npm test
+ */
+export async function installTest(args: string[], globalArgs: string[] = []): Promise<number> {
+  const installResult = await install(args, globalArgs);
+  if (installResult !== 0) {
+    return installResult;
+  }
+
+  const testResult = await spawnPnpm(['test']);
+  return testResult.exitCode ?? 0;
+}
+
+/**
+ * CI install and then run tests.
+ * Equivalent to: npm ci && npm test
+ */
+export async function installCiTest(args: string[], globalArgs: string[] = []): Promise<number> {
+  const ciResult = await ci(args, globalArgs);
+  if (ciResult !== 0) {
+    return ciResult;
+  }
+
+  const testResult = await spawnPnpm(['test']);
+  return testResult.exitCode ?? 0;
 }

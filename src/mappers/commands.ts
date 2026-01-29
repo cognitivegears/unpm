@@ -92,6 +92,26 @@ const commandMappings: CommandMapping[] = [
   { npmCommand: 'help', pnpmCommand: 'help', type: 'pnpm-direct' },
   { npmCommand: 'explain', pnpmCommand: 'why', type: 'pnpm-direct', aliases: ['why'] },
 
+  // Diagnostic commands
+  { npmCommand: 'ping', pnpmCommand: 'ping', type: 'npm-passthrough', requiresSecurityFlags: false },
+  { npmCommand: 'doctor', pnpmCommand: 'doctor', type: 'npm-passthrough', requiresSecurityFlags: false },
+  { npmCommand: 'help-search', pnpmCommand: 'help-search', type: 'npm-passthrough', requiresSecurityFlags: false },
+
+  // Package commands
+  { npmCommand: 'pkg', pnpmCommand: 'pkg', type: 'npm-passthrough', requiresSecurityFlags: false },
+  { npmCommand: 'query', pnpmCommand: 'ls', type: 'pnpm-mapped' },
+  { npmCommand: 'edit', pnpmCommand: 'edit', type: 'npm-passthrough', requiresSecurityFlags: false },
+  { npmCommand: 'explore', pnpmCommand: 'explore', type: 'custom' }, // Blocked by default
+  { npmCommand: 'sbom', pnpmCommand: 'sbom', type: 'npm-passthrough', requiresSecurityFlags: false },
+  { npmCommand: 'find-dupes', pnpmCommand: 'dedupe', type: 'pnpm-mapped' },
+
+  // Compound commands
+  { npmCommand: 'install-test', pnpmCommand: '', type: 'custom', aliases: ['it'] },
+  { npmCommand: 'install-ci-test', pnpmCommand: '', type: 'custom', aliases: ['cit'] },
+
+  // Undeprecate
+  { npmCommand: 'undeprecate', pnpmCommand: '', type: 'custom' },
+
   // Custom commands
   { npmCommand: 'migrate', pnpmCommand: '', type: 'custom' },
   { npmCommand: 'setup-lavamoat', pnpmCommand: '', type: 'custom' },

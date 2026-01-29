@@ -69,6 +69,27 @@ export function spawnPnpm(
   });
 }
 
+/**
+ * Spawn pnpm with additional environment variables.
+ * Useful for setting pnpm config via npm_config_ prefix.
+ */
+export function spawnPnpmWithEnv(
+  args: string[],
+  envVars: Record<string, string>,
+  options: ExecOptions = {}
+): ResultPromise {
+  const cmd = `pnpm ${args.join(' ')}`;
+  logger.command(cmd);
+
+  return execa('pnpm', args, {
+    ...buildExecaOptions({
+      ...options,
+      env: { ...options.env, ...envVars },
+    }),
+    stdio: 'inherit',
+  });
+}
+
 export function spawnNpm(
   args: string[],
   options: ExecOptions = {}

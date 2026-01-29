@@ -17,6 +17,7 @@ export function createCli(): Command {
     .version(VERSION)
     .option('-v, --verbose', 'Enable verbose output')
     .option('-q, --quiet', 'Suppress output')
+    .option('--strict', 'Enable strict security mode for CI environments')
     .hook('preAction', (thisCommand) => {
       const opts = thisCommand.opts();
       if (opts['verbose']) {
@@ -26,15 +27,26 @@ export function createCli(): Command {
       }
     });
 
+  // Helper to get global args from parent command
+  const getGlobalArgs = (cmd: Command): string[] => {
+    const parent = cmd.parent;
+    if (!parent) return [];
+    const opts = parent.opts();
+    const args: string[] = [];
+    if (opts['strict']) args.push('--strict');
+    return args;
+  };
+
   // Install commands
   program
     .command('install [packages...]')
     .alias('i')
     .description('Install dependencies')
     .allowUnknownOption()
-    .action(async (packages: string[], _opts, cmd) => {
-      const args = [...packages, ...cmd.args];
-      process.exitCode = await commands.install(args);
+    .action(async (_packages: string[], _opts, cmd) => {
+      // cmd.args already contains packages and flags
+      const globalArgs = getGlobalArgs(cmd);
+      process.exitCode = await commands.install(cmd.args, globalArgs);
     });
 
   program
@@ -42,16 +54,18 @@ export function createCli(): Command {
     .description('Clean install (equivalent to npm ci)')
     .allowUnknownOption()
     .action(async (_opts, cmd) => {
-      process.exitCode = await commands.ci(cmd.args);
+      const globalArgs = getGlobalArgs(cmd);
+      process.exitCode = await commands.ci(cmd.args, globalArgs);
     });
 
   program
     .command('add <packages...>')
     .description('Add packages')
     .allowUnknownOption()
-    .action(async (packages: string[], _opts, cmd) => {
-      const args = [...packages, ...cmd.args];
-      process.exitCode = await commands.add(args);
+    .action(async (_packages: string[], _opts, cmd) => {
+      // cmd.args already contains packages and flags
+      const globalArgs = getGlobalArgs(cmd);
+      process.exitCode = await commands.add(cmd.args, globalArgs);
     });
 
   program
@@ -59,9 +73,9 @@ export function createCli(): Command {
     .aliases(['rm', 'uninstall', 'un'])
     .description('Remove packages')
     .allowUnknownOption()
-    .action(async (packages: string[], _opts, cmd) => {
-      const args = [...packages, ...cmd.args];
-      process.exitCode = await commands.remove(args);
+    .action(async (_packages: string[], _opts, cmd) => {
+      // cmd.args already contains packages and flags
+      process.exitCode = await commands.remove(cmd.args);
     });
 
   program
@@ -69,9 +83,31 @@ export function createCli(): Command {
     .aliases(['up', 'upgrade'])
     .description('Update packages')
     .allowUnknownOption()
-    .action(async (packages: string[], _opts, cmd) => {
-      const args = [...packages, ...cmd.args];
-      process.exitCode = await commands.update(args);
+    .action(async (_packages: string[], _opts, cmd) => {
+      // cmd.args already contains packages and flags
+      const globalArgs = getGlobalArgs(cmd);
+      process.exitCode = await commands.update(cmd.args, globalArgs);
+    });
+
+  // Compound install commands
+  program
+    .command('install-test')
+    .alias('it')
+    .description('Install packages and run tests')
+    .allowUnknownOption()
+    .action(async (_opts, cmd) => {
+      const globalArgs = getGlobalArgs(cmd);
+      process.exitCode = await commands.installTest(cmd.args, globalArgs);
+    });
+
+  program
+    .command('install-ci-test')
+    .alias('cit')
+    .description('CI install and run tests')
+    .allowUnknownOption()
+    .action(async (_opts, cmd) => {
+      const globalArgs = getGlobalArgs(cmd);
+      process.exitCode = await commands.installCiTest(cmd.args, globalArgs);
     });
 
   // Run commands
@@ -128,10 +164,11 @@ export function createCli(): Command {
 
   program
     .command('dlx <package>')
-    .description('Download and execute a package')
+    .description('Download and execute a package (requires --allow-dlx)')
     .allowUnknownOption()
     .action(async (pkg: string, _opts, cmd) => {
-      process.exitCode = await commands.dlx([pkg, ...cmd.args]);
+      const globalArgs = getGlobalArgs(cmd);
+      process.exitCode = await commands.dlx([pkg, ...cmd.args], globalArgs);
     });
 
   // Package management
@@ -170,6 +207,14 @@ export function createCli(): Command {
     });
 
   program
+    .command('undeprecate <package>')
+    .description('Remove deprecation warning from a package')
+    .allowUnknownOption()
+    .action(async (pkg: string, _opts, cmd) => {
+      process.exitCode = await commands.undeprecate([pkg, ...cmd.args]);
+    });
+
+  program
     .command('pack')
     .description('Create a tarball')
     .allowUnknownOption()
@@ -202,18 +247,18 @@ export function createCli(): Command {
     .aliases(['list', 'la', 'll'])
     .description('List installed packages')
     .allowUnknownOption()
-    .action(async (packages: string[], _opts, cmd) => {
-      const args = [...packages, ...cmd.args];
-      process.exitCode = await commands.ls(args);
+    .action(async (_packages: string[], _opts, cmd) => {
+      // cmd.args already contains packages and flags
+      process.exitCode = await commands.ls(cmd.args);
     });
 
   program
     .command('outdated [packages...]')
     .description('Check for outdated packages')
     .allowUnknownOption()
-    .action(async (packages: string[], _opts, cmd) => {
-      const args = [...packages, ...cmd.args];
-      process.exitCode = await commands.outdated(args);
+    .action(async (_packages: string[], _opts, cmd) => {
+      // cmd.args already contains packages and flags
+      process.exitCode = await commands.outdated(cmd.args);
     });
 
   program
@@ -269,7 +314,8 @@ export function createCli(): Command {
     .description('Run security audit')
     .allowUnknownOption()
     .action(async (_opts, cmd) => {
-      process.exitCode = await commands.audit(cmd.args);
+      const globalArgs = getGlobalArgs(cmd);
+      process.exitCode = await commands.audit(cmd.args, globalArgs);
     });
 
   program
@@ -373,6 +419,114 @@ export function createCli(): Command {
     .allowUnknownOption()
     .action(async (_opts, cmd) => {
       process.exitCode = await commands.cache(cmd.args);
+    });
+
+  // Diagnostic commands
+  program
+    .command('ping')
+    .description('Ping the npm registry')
+    .allowUnknownOption()
+    .action(async (_opts, cmd) => {
+      process.exitCode = await commands.ping(cmd.args);
+    });
+
+  program
+    .command('doctor')
+    .description('Run environment diagnostics')
+    .allowUnknownOption()
+    .action(async (_opts, cmd) => {
+      process.exitCode = await commands.doctor(cmd.args);
+    });
+
+  program
+    .command('help-search <query>')
+    .description('Search npm help documentation')
+    .allowUnknownOption()
+    .action(async (query: string, _opts, cmd) => {
+      process.exitCode = await commands.helpSearch([query, ...cmd.args]);
+    });
+
+  // Organization and team commands
+  program
+    .command('team')
+    .description('Manage npm teams')
+    .allowUnknownOption()
+    .action(async (_opts, cmd) => {
+      process.exitCode = await commands.team(cmd.args);
+    });
+
+  program
+    .command('org')
+    .description('Manage npm organizations')
+    .allowUnknownOption()
+    .action(async (_opts, cmd) => {
+      process.exitCode = await commands.org(cmd.args);
+    });
+
+  program
+    .command('profile')
+    .description('Manage npm profile')
+    .allowUnknownOption()
+    .action(async (_opts, cmd) => {
+      process.exitCode = await commands.profile(cmd.args);
+    });
+
+  program
+    .command('hook')
+    .description('Manage npm registry hooks')
+    .allowUnknownOption()
+    .action(async (_opts, cmd) => {
+      process.exitCode = await commands.hook(cmd.args);
+    });
+
+  // Package commands
+  program
+    .command('pkg')
+    .description('Manage package.json properties')
+    .allowUnknownOption()
+    .action(async (_opts, cmd) => {
+      process.exitCode = await commands.pkg(cmd.args);
+    });
+
+  program
+    .command('query <selector>')
+    .description('Query installed packages')
+    .allowUnknownOption()
+    .action(async (selector: string, _opts, cmd) => {
+      process.exitCode = await commands.query([selector, ...cmd.args]);
+    });
+
+  program
+    .command('edit <package>')
+    .description('Open package in editor')
+    .allowUnknownOption()
+    .action(async (pkg: string, _opts, cmd) => {
+      process.exitCode = await commands.edit([pkg, ...cmd.args]);
+    });
+
+  program
+    .command('explore <package>')
+    .description('Explore package in subshell (requires --allow-explore)')
+    .allowUnknownOption()
+    .action(async (pkg: string, _opts, cmd) => {
+      const globalArgs = getGlobalArgs(cmd);
+      process.exitCode = await commands.explore([pkg, ...cmd.args], globalArgs);
+    });
+
+  program
+    .command('sbom')
+    .description('Generate Software Bill of Materials')
+    .allowUnknownOption()
+    .action(async (_opts, cmd) => {
+      process.exitCode = await commands.sbom(cmd.args);
+    });
+
+  program
+    .command('find-dupes')
+    .description('Find duplicate packages')
+    .allowUnknownOption()
+    .action(async (_opts, cmd) => {
+      process.exitCode = await commands.findDupes(cmd.args);
     });
 
   // Misc

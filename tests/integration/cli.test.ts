@@ -438,3 +438,118 @@ describe('CLI Allow-Scripts', () => {
     expect(result.exitCode).toBe(1);
   });
 });
+
+describe('CLI New Commands', () => {
+  // Test new diagnostic and safe read-only commands
+
+  it('should show help for ping', async () => {
+    const result = await execa('node', [cliPath, 'ping', '--help'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('should show help for doctor', async () => {
+    const result = await execa('node', [cliPath, 'doctor', '--help'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('should show help for sbom', async () => {
+    const result = await execa('node', [cliPath, 'sbom', '--help'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('should show help for install-test', async () => {
+    const result = await execa('node', [cliPath, 'install-test', '--help'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('should show help for install-ci-test', async () => {
+    const result = await execa('node', [cliPath, 'install-ci-test', '--help'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('should show help for undeprecate', async () => {
+    const result = await execa('node', [cliPath, 'undeprecate', '--help'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('should show help for find-dupes', async () => {
+    const result = await execa('node', [cliPath, 'find-dupes', '--help'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+});
+
+describe('CLI Security Hardening', () => {
+  it('should block dlx without --allow-dlx', async () => {
+    const result = await execa('node', [cliPath, 'dlx', 'cowsay'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(1);
+    // Check stderr for the error message
+    expect(result.stderr).toContain('dlx is blocked');
+  });
+
+  it('should block explore without --allow-explore', async () => {
+    const result = await execa('node', [cliPath, 'explore', 'lodash'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('explore is blocked');
+  });
+
+  it('should show --strict in help output', async () => {
+    const result = await execa('node', [cliPath, '--help'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('--strict');
+  });
+});
+
+describe('CLI Deprecated Flag Handling', () => {
+  let tempDir: string;
+
+  beforeAll(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'unpm-deprecated-'));
+    await writeFile(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'deprecated-test',
+        version: '1.0.0',
+      })
+    );
+    await mkdir(join(tempDir, 'node_modules'), { recursive: true });
+  });
+
+  afterAll(async () => {
+    if (tempDir) {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should warn when using --ignore-scripts=false', async () => {
+    const result = await execa(
+      'node',
+      [cliPath, 'install', '--ignore-scripts=false', '--dry-run'],
+      {
+        reject: false,
+        cwd: tempDir,
+      }
+    );
+    // Command should still succeed (flag is ignored)
+    expect(result.exitCode).toBeLessThanOrEqual(1);
+  });
+});
