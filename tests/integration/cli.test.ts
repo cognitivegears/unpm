@@ -64,46 +64,34 @@ describe('CLI Read-Only Commands', () => {
   // Note: unpm uses stdio: 'inherit' so output goes directly to terminal.
   // Tests verify exit codes and that commands don't crash.
 
-  it(
-    'should view package info successfully',
-    async () => {
-      const result = await execa('node', [cliPath, 'view', 'lodash'], {
+  it('should view package info successfully', async () => {
+    const result = await execa('node', [cliPath, 'view', 'lodash'], {
+      reject: false,
+      timeout: 30000,
+    });
+    expect(result.exitCode).toBe(0);
+  }, 30000);
+
+  it('should view specific package version', async () => {
+    const result = await execa(
+      'node',
+      [cliPath, 'view', 'lodash@4.17.21', 'version'],
+      {
         reject: false,
         timeout: 30000,
-      });
-      expect(result.exitCode).toBe(0);
-    },
-    30000
-  );
+      }
+    );
+    expect(result.exitCode).toBe(0);
+  }, 30000);
 
-  it(
-    'should view specific package version',
-    async () => {
-      const result = await execa(
-        'node',
-        [cliPath, 'view', 'lodash@4.17.21', 'version'],
-        {
-          reject: false,
-          timeout: 30000,
-        }
-      );
-      expect(result.exitCode).toBe(0);
-    },
-    30000
-  );
-
-  it(
-    'should return error for non-existent package',
-    async () => {
-      const result = await execa(
-        'node',
-        [cliPath, 'view', 'this-package-definitely-does-not-exist-12345'],
-        { reject: false, timeout: 30000 }
-      );
-      expect(result.exitCode).not.toBe(0);
-    },
-    30000
-  );
+  it('should return error for non-existent package', async () => {
+    const result = await execa(
+      'node',
+      [cliPath, 'view', 'this-package-definitely-does-not-exist-12345'],
+      { reject: false, timeout: 30000 }
+    );
+    expect(result.exitCode).not.toBe(0);
+  }, 30000);
 
   it('should show bin path', async () => {
     const result = await execa('node', [cliPath, 'bin'], { reject: false });
