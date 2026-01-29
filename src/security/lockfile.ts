@@ -28,7 +28,10 @@ export async function isGitRepo(cwd?: string): Promise<boolean> {
  * Check if a file is in .gitignore.
  * This is a simple check that looks for the filename in .gitignore.
  */
-export async function isInGitignore(filename: string, cwd?: string): Promise<boolean> {
+export async function isInGitignore(
+  filename: string,
+  cwd?: string
+): Promise<boolean> {
   const dir = cwd ?? process.cwd();
   const gitignorePath = join(dir, '.gitignore');
 
@@ -75,7 +78,10 @@ export async function isInGitignore(filename: string, cwd?: string): Promise<boo
  * In strict mode, these are errors (blocks the command).
  * In normal mode, these are warnings.
  */
-export async function checkLockfile(args: string[] = [], cwd?: string): Promise<LockfileCheckResult> {
+export async function checkLockfile(
+  args: string[] = [],
+  cwd?: string
+): Promise<LockfileCheckResult> {
   const strict = await isStrictMode(args, cwd);
   const hasLockfile = await hasPnpmLock(cwd);
   const inGitRepo = await isGitRepo(cwd);
@@ -86,10 +92,14 @@ export async function checkLockfile(args: string[] = [], cwd?: string): Promise<
   // Check if lockfile exists
   if (!hasLockfile) {
     if (strict) {
-      messages.push('No pnpm-lock.yaml found. Lockfile is required in strict mode.');
+      messages.push(
+        'No pnpm-lock.yaml found. Lockfile is required in strict mode.'
+      );
       messages.push('Run "unpm install" to generate a lockfile.');
     } else {
-      messages.push('No pnpm-lock.yaml found. Consider committing a lockfile for reproducible builds.');
+      messages.push(
+        'No pnpm-lock.yaml found. Consider committing a lockfile for reproducible builds.'
+      );
     }
   }
 
@@ -98,10 +108,16 @@ export async function checkLockfile(args: string[] = [], cwd?: string): Promise<
     isGitignored = await isInGitignore('pnpm-lock.yaml', cwd);
     if (isGitignored) {
       if (strict) {
-        messages.push('pnpm-lock.yaml is in .gitignore. Lockfile must be committed in strict mode.');
-        messages.push('Remove pnpm-lock.yaml from .gitignore to enable reproducible builds.');
+        messages.push(
+          'pnpm-lock.yaml is in .gitignore. Lockfile must be committed in strict mode.'
+        );
+        messages.push(
+          'Remove pnpm-lock.yaml from .gitignore to enable reproducible builds.'
+        );
       } else {
-        messages.push('pnpm-lock.yaml is in .gitignore. Consider committing the lockfile for reproducible builds.');
+        messages.push(
+          'pnpm-lock.yaml is in .gitignore. Consider committing the lockfile for reproducible builds.'
+        );
       }
     }
   }
@@ -121,7 +137,10 @@ export async function checkLockfile(args: string[] = [], cwd?: string): Promise<
  * Validate lockfile and log warnings/errors.
  * Returns true if the command should proceed, false if it should be blocked.
  */
-export async function validateLockfile(args: string[] = [], cwd?: string): Promise<boolean> {
+export async function validateLockfile(
+  args: string[] = [],
+  cwd?: string
+): Promise<boolean> {
   const result = await checkLockfile(args, cwd);
   const strict = await isStrictMode(args, cwd);
 

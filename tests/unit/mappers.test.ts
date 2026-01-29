@@ -107,7 +107,12 @@ describe('mapNpmCiToPnpm', () => {
 
 describe('extractPackagesFromArgs', () => {
   it('should separate packages from flags', () => {
-    const result = extractPackagesFromArgs(['lodash', '-D', 'axios', '--save-exact']);
+    const result = extractPackagesFromArgs([
+      'lodash',
+      '-D',
+      'axios',
+      '--save-exact',
+    ]);
     expect(result.packages).toEqual(['lodash', 'axios']);
     expect(result.flags).toEqual(['-D', '--save-exact']);
   });
@@ -153,13 +158,20 @@ describe('extractPackagesFromArgs', () => {
   });
 
   it('should not consume next arg as value if it starts with dash', () => {
-    const result = extractPackagesFromArgs(['--registry', '--verbose', 'lodash']);
+    const result = extractPackagesFromArgs([
+      '--registry',
+      '--verbose',
+      'lodash',
+    ]);
     expect(result.packages).toEqual(['lodash']);
     expect(result.flags).toEqual(['--registry', '--verbose']);
   });
 
   it('should handle flag with = syntax for value flags', () => {
-    const result = extractPackagesFromArgs(['--registry=https://example.com', 'lodash']);
+    const result = extractPackagesFromArgs([
+      '--registry=https://example.com',
+      'lodash',
+    ]);
     expect(result.packages).toEqual(['lodash']);
     expect(result.flags).toEqual(['--registry=https://example.com']);
   });
@@ -228,7 +240,9 @@ describe('getFlagValue', () => {
 
 describe('removeFlag', () => {
   it('should remove flag followed by another flag', () => {
-    expect(removeFlag(['--verbose', '--other'], '--verbose')).toEqual(['--other']);
+    expect(removeFlag(['--verbose', '--other'], '--verbose')).toEqual([
+      '--other',
+    ]);
   });
 
   it('should remove flag with value', () => {
@@ -358,7 +372,11 @@ describe('removeUnpmOnlyFlags', () => {
   });
 
   it('should preserve regular npm flags', () => {
-    const result = removeUnpmOnlyFlags(['--save-dev', '--strict', '--production']);
+    const result = removeUnpmOnlyFlags([
+      '--save-dev',
+      '--strict',
+      '--production',
+    ]);
     expect(result).toEqual(['--save-dev', '--production']);
   });
 

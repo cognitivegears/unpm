@@ -186,9 +186,13 @@ describe('validateStrictModeAction', () => {
 
   it('should block force-scripts in strict mode', async () => {
     vi.mocked(configModule.readPackageJson).mockResolvedValue(null);
-    const result = await validateStrictModeAction('force-scripts', ['--strict']);
+    const result = await validateStrictModeAction('force-scripts', [
+      '--strict',
+    ]);
     expect(result.allowed).toBe(false);
-    expect(result.reason).toContain('--force-scripts is blocked in strict mode');
+    expect(result.reason).toContain(
+      '--force-scripts is blocked in strict mode'
+    );
   });
 
   it('should allow explore when not in strict mode', async () => {

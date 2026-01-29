@@ -103,7 +103,9 @@ describe('extractReleaseAgeFlags', () => {
 
     expect(result.cleanedArgs).toEqual([]);
     expect(result.releaseAgeFlags.disabled).toBe(false);
-    expect(result.releaseAgeFlags.minAgeMinutes).toBe(DEFAULT_MIN_RELEASE_AGE_MINUTES);
+    expect(result.releaseAgeFlags.minAgeMinutes).toBe(
+      DEFAULT_MIN_RELEASE_AGE_MINUTES
+    );
     // Uses --config.minimum-release-age flag format with numeric minutes
     expect(result.releaseAgeFlags.flags).toEqual([
       `--config.minimum-release-age=2880`,
@@ -112,7 +114,10 @@ describe('extractReleaseAgeFlags', () => {
   });
 
   it('should parse --min-release-age flag with value', async () => {
-    const result = await extractReleaseAgeFlags(['--min-release-age=1d', 'lodash']);
+    const result = await extractReleaseAgeFlags([
+      '--min-release-age=1d',
+      'lodash',
+    ]);
 
     expect(result.cleanedArgs).toEqual(['lodash']);
     expect(result.releaseAgeFlags.minAgeMinutes).toBe(1440);
@@ -122,7 +127,11 @@ describe('extractReleaseAgeFlags', () => {
   });
 
   it('should parse --min-release-age flag with separate value', async () => {
-    const result = await extractReleaseAgeFlags(['--min-release-age', '4h', 'lodash']);
+    const result = await extractReleaseAgeFlags([
+      '--min-release-age',
+      '4h',
+      'lodash',
+    ]);
 
     expect(result.cleanedArgs).toEqual(['lodash']);
     expect(result.releaseAgeFlags.minAgeMinutes).toBe(240);
@@ -132,7 +141,10 @@ describe('extractReleaseAgeFlags', () => {
   });
 
   it('should parse --no-min-release-age flag', async () => {
-    const result = await extractReleaseAgeFlags(['--no-min-release-age', 'lodash']);
+    const result = await extractReleaseAgeFlags([
+      '--no-min-release-age',
+      'lodash',
+    ]);
 
     expect(result.cleanedArgs).toEqual(['lodash']);
     expect(result.releaseAgeFlags.disabled).toBe(true);
@@ -141,17 +153,28 @@ describe('extractReleaseAgeFlags', () => {
   });
 
   it('should parse --allow-recent flag with value', async () => {
-    const result = await extractReleaseAgeFlags(['--allow-recent=lodash', 'axios']);
+    const result = await extractReleaseAgeFlags([
+      '--allow-recent=lodash',
+      'axios',
+    ]);
 
     expect(result.cleanedArgs).toEqual(['axios']);
-    expect(result.releaseAgeFlags.minAgeMinutes).toBe(DEFAULT_MIN_RELEASE_AGE_MINUTES);
+    expect(result.releaseAgeFlags.minAgeMinutes).toBe(
+      DEFAULT_MIN_RELEASE_AGE_MINUTES
+    );
   });
 
   it('should parse --allow-recent flag with separate value', async () => {
-    const result = await extractReleaseAgeFlags(['--allow-recent', 'lodash', 'axios']);
+    const result = await extractReleaseAgeFlags([
+      '--allow-recent',
+      'lodash',
+      'axios',
+    ]);
 
     expect(result.cleanedArgs).toEqual(['axios']);
-    expect(result.releaseAgeFlags.minAgeMinutes).toBe(DEFAULT_MIN_RELEASE_AGE_MINUTES);
+    expect(result.releaseAgeFlags.minAgeMinutes).toBe(
+      DEFAULT_MIN_RELEASE_AGE_MINUTES
+    );
   });
 
   it('should handle multiple --allow-recent flags', async () => {
@@ -162,7 +185,9 @@ describe('extractReleaseAgeFlags', () => {
     ]);
 
     expect(result.cleanedArgs).toEqual(['express']);
-    expect(result.releaseAgeFlags.minAgeMinutes).toBe(DEFAULT_MIN_RELEASE_AGE_MINUTES);
+    expect(result.releaseAgeFlags.minAgeMinutes).toBe(
+      DEFAULT_MIN_RELEASE_AGE_MINUTES
+    );
   });
 
   it('should use config from package.json', async () => {

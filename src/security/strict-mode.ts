@@ -54,7 +54,10 @@ const NORMAL_MODE_DEFAULTS: StrictModeConfig = {
  * @param args - CLI arguments to check for --strict flag
  * @param cwd - Working directory to read package.json from
  */
-export async function isStrictMode(args: string[] = [], cwd?: string): Promise<boolean> {
+export async function isStrictMode(
+  args: string[] = [],
+  cwd?: string
+): Promise<boolean> {
   // Check CLI flag first (highest priority)
   if (args.includes('--strict')) {
     return true;
@@ -71,15 +74,20 @@ export async function isStrictMode(args: string[] = [], cwd?: string): Promise<b
 
   // Check package.json config
   const packageJson = await readPackageJson(cwd);
-  const unpmConfig = packageJson?.['unpm'] as {
-    strict?: { enabled?: boolean } | boolean;
-  } | undefined;
+  const unpmConfig = packageJson?.['unpm'] as
+    | {
+        strict?: { enabled?: boolean } | boolean;
+      }
+    | undefined;
 
   if (unpmConfig?.strict !== undefined) {
     if (typeof unpmConfig.strict === 'boolean') {
       return unpmConfig.strict;
     }
-    if (typeof unpmConfig.strict === 'object' && unpmConfig.strict.enabled !== undefined) {
+    if (
+      typeof unpmConfig.strict === 'object' &&
+      unpmConfig.strict.enabled !== undefined
+    ) {
       return unpmConfig.strict.enabled;
     }
   }
@@ -93,7 +101,10 @@ export async function isStrictMode(args: string[] = [], cwd?: string): Promise<b
  * @param args - CLI arguments to check for --strict flag
  * @param cwd - Working directory to read package.json from
  */
-export async function getStrictModeConfig(args: string[] = [], cwd?: string): Promise<StrictModeConfig> {
+export async function getStrictModeConfig(
+  args: string[] = [],
+  cwd?: string
+): Promise<StrictModeConfig> {
   const enabled = await isStrictMode(args, cwd);
 
   if (!enabled) {
@@ -104,9 +115,11 @@ export async function getStrictModeConfig(args: string[] = [], cwd?: string): Pr
   const config = { ...STRICT_MODE_DEFAULTS };
 
   const packageJson = await readPackageJson(cwd);
-  const unpmConfig = packageJson?.['unpm'] as {
-    strict?: Partial<StrictModeConfig>;
-  } | undefined;
+  const unpmConfig = packageJson?.['unpm'] as
+    | {
+        strict?: Partial<StrictModeConfig>;
+      }
+    | undefined;
 
   if (unpmConfig?.strict && typeof unpmConfig.strict === 'object') {
     // Allow overriding specific settings in package.json
@@ -161,7 +174,8 @@ export async function validateStrictModeAction(
       if (config.blockDlx) {
         return {
           allowed: false,
-          reason: 'dlx is blocked in strict mode. Remove --strict or disable via package.json unpm.strict.blockDlx: false',
+          reason:
+            'dlx is blocked in strict mode. Remove --strict or disable via package.json unpm.strict.blockDlx: false',
         };
       }
       return { allowed: true };
@@ -170,7 +184,8 @@ export async function validateStrictModeAction(
       if (config.blockForceScripts) {
         return {
           allowed: false,
-          reason: '--force-scripts is blocked in strict mode. Remove --strict or disable via package.json unpm.strict.blockForceScripts: false',
+          reason:
+            '--force-scripts is blocked in strict mode. Remove --strict or disable via package.json unpm.strict.blockForceScripts: false',
         };
       }
       return { allowed: true };
@@ -179,7 +194,8 @@ export async function validateStrictModeAction(
       if (config.blockExplore) {
         return {
           allowed: false,
-          reason: 'explore is blocked in strict mode. Remove --strict or disable via package.json unpm.strict.blockExplore: false',
+          reason:
+            'explore is blocked in strict mode. Remove --strict or disable via package.json unpm.strict.blockExplore: false',
         };
       }
       return { allowed: true };

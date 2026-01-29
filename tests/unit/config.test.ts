@@ -110,8 +110,8 @@ describe('setLavamoatAllowScripts', () => {
   it('should throw when no package.json', async () => {
     vi.mocked(readFile).mockRejectedValue(new Error('ENOENT'));
 
-    await expect(setLavamoatAllowScripts({ esbuild: true }, '/test')).rejects.toThrow(
-      'package.json not found'
-    );
+    await expect(
+      setLavamoatAllowScripts({ esbuild: true }, '/test')
+    ).rejects.toThrow('package.json not found');
   });
 });

@@ -8,7 +8,10 @@ import { logger } from '../utils/logger.js';
  * In strict mode, returns non-zero exit code for high/critical vulnerabilities
  * by adding --audit-level=high.
  */
-export async function audit(args: string[], globalArgs: string[] = []): Promise<number> {
+export async function audit(
+  args: string[],
+  globalArgs: string[] = []
+): Promise<number> {
   const allArgs = [...globalArgs, ...args];
   const strictMode = await isStrictMode(allArgs);
 
@@ -22,7 +25,9 @@ export async function audit(args: string[], globalArgs: string[] = []): Promise<
 
     if (!hasAuditLevel) {
       pnpmArgs.push('--audit-level=high');
-      logger.debug('Strict mode: Failing audit on high/critical vulnerabilities');
+      logger.debug(
+        'Strict mode: Failing audit on high/critical vulnerabilities'
+      );
     }
   }
 

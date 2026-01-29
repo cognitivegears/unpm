@@ -74,10 +74,12 @@ export async function rebuild(args: string[]): Promise<number> {
     // Rebuilding all packages - this is dangerous
     logger.warn('');
     logger.warn(
-      chalk.yellow('  Warning: `rebuild` without package names would run install scripts for ALL packages.')
+      chalk.yellow(
+        '  Warning: `rebuild` without package names would run install scripts for ALL packages.'
+      )
     );
     logger.warn('');
-    logger.warn('  This bypasses unpm\'s security protections.');
+    logger.warn("  This bypasses unpm's security protections.");
     logger.warn('');
     logger.warn('  To rebuild specific allowed packages:');
     logger.warn(chalk.cyan('    unpm rebuild <package-name>'));
@@ -103,18 +105,24 @@ export async function rebuild(args: string[]): Promise<number> {
   // Warn about blocked packages
   if (blockedPackages.length > 0) {
     logger.warn('');
-    logger.warn(chalk.yellow(`  The following packages are not in the allowlist and will be skipped:`));
+    logger.warn(
+      chalk.yellow(
+        `  The following packages are not in the allowlist and will be skipped:`
+      )
+    );
     for (const pkg of blockedPackages) {
       logger.warn(chalk.yellow(`    - ${pkg}`));
     }
     logger.warn('');
-    logger.warn('  To allow a package\'s scripts, run:');
+    logger.warn("  To allow a package's scripts, run:");
     logger.warn(chalk.cyan('    unpm allow-scripts add <package-name>'));
     logger.warn('');
   }
 
   if (allowedPackages.length === 0 && !forceAll) {
-    logger.error('No packages to rebuild (all were blocked by security policy)');
+    logger.error(
+      'No packages to rebuild (all were blocked by security policy)'
+    );
     return 1;
   }
 

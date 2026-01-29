@@ -655,8 +655,13 @@ export function createCli(): Command {
 
     if (!mapping) {
       // Try to pass through to pnpm
-      logger.debug(`Unknown command "${unknownCommand}", trying pnpm passthrough`);
-      process.exitCode = await passthroughToPnpm(unknownCommand, operands.slice(1));
+      logger.debug(
+        `Unknown command "${unknownCommand}", trying pnpm passthrough`
+      );
+      process.exitCode = await passthroughToPnpm(
+        unknownCommand,
+        operands.slice(1)
+      );
       return;
     }
 

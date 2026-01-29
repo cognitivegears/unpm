@@ -7,7 +7,10 @@ import { logger } from '../utils/logger.js';
  */
 async function isKnipInstalledLocally(): Promise<boolean> {
   try {
-    await execa('pnpm', ['exec', 'knip', '--version'], { reject: true, stdio: 'pipe' });
+    await execa('pnpm', ['exec', 'knip', '--version'], {
+      reject: true,
+      stdio: 'pipe',
+    });
     return true;
   } catch {
     return false;
@@ -38,7 +41,10 @@ export async function unused(args: string[]): Promise<number> {
   // By default, only check for unused dependencies (not unlisted binaries, etc.)
   // Use --include to specifically select only unused dependency issue types
   if (!hasEverything) {
-    knipArgs.push('--include', 'dependencies,devDependencies,optionalPeerDependencies');
+    knipArgs.push(
+      '--include',
+      'dependencies,devDependencies,optionalPeerDependencies'
+    );
   }
 
   if (hasFix) {
@@ -95,7 +101,9 @@ export async function unused(args: string[]): Promise<number> {
         logger.info(chalk.yellow('  Unused code found. To fix, run:'));
         logger.info(chalk.cyan('    unpm unused --everything --fix'));
       } else {
-        logger.info(chalk.yellow('  Unused dependencies found. To remove them, run:'));
+        logger.info(
+          chalk.yellow('  Unused dependencies found. To remove them, run:')
+        );
         logger.info(chalk.cyan('    unpm unused --fix'));
       }
       logger.info('');

@@ -41,7 +41,9 @@ describe('isGitRepo', () => {
   it('should use process.cwd() when no cwd provided', async () => {
     vi.mocked(configModule.fileExists).mockResolvedValue(true);
     await isGitRepo();
-    expect(configModule.fileExists).toHaveBeenCalledWith(expect.stringContaining('.git'));
+    expect(configModule.fileExists).toHaveBeenCalledWith(
+      expect.stringContaining('.git')
+    );
   });
 });
 
@@ -51,7 +53,9 @@ describe('isInGitignore', () => {
   });
 
   it('should return true when filename is in .gitignore', async () => {
-    vi.mocked(fsPromises.readFile).mockResolvedValue('node_modules\npnpm-lock.yaml\n');
+    vi.mocked(fsPromises.readFile).mockResolvedValue(
+      'node_modules\npnpm-lock.yaml\n'
+    );
     expect(await isInGitignore('pnpm-lock.yaml', '/test/path')).toBe(true);
   });
 
@@ -71,7 +75,9 @@ describe('isInGitignore', () => {
   });
 
   it('should ignore comments in .gitignore', async () => {
-    vi.mocked(fsPromises.readFile).mockResolvedValue('# pnpm-lock.yaml\nnode_modules\n');
+    vi.mocked(fsPromises.readFile).mockResolvedValue(
+      '# pnpm-lock.yaml\nnode_modules\n'
+    );
     expect(await isInGitignore('pnpm-lock.yaml', '/test/path')).toBe(false);
   });
 

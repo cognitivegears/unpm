@@ -17,13 +17,17 @@ describe('CLI Integration', () => {
   });
 
   it('should show version', async () => {
-    const result = await execa('node', [cliPath, '--version'], { reject: false });
+    const result = await execa('node', [cliPath, '--version'], {
+      reject: false,
+    });
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toMatch(/\d+\.\d+\.\d+/);
   });
 
   it('should show help for allow-scripts', async () => {
-    const result = await execa('node', [cliPath, 'allow-scripts'], { reject: false });
+    const result = await execa('node', [cliPath, 'allow-scripts'], {
+      reject: false,
+    });
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('unpm allow-scripts');
     expect(result.stdout).toContain('add');
@@ -32,19 +36,25 @@ describe('CLI Integration', () => {
   });
 
   it('should show help for migrate', async () => {
-    const result = await execa('node', [cliPath, 'migrate', '--help'], { reject: false });
+    const result = await execa('node', [cliPath, 'migrate', '--help'], {
+      reject: false,
+    });
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('Migrate from npm to unpm/pnpm');
   });
 
   it('should show help for install', async () => {
-    const result = await execa('node', [cliPath, 'install', '--help'], { reject: false });
+    const result = await execa('node', [cliPath, 'install', '--help'], {
+      reject: false,
+    });
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('install');
   });
 
   it('should show help for run', async () => {
-    const result = await execa('node', [cliPath, 'run', '--help'], { reject: false });
+    const result = await execa('node', [cliPath, 'run', '--help'], {
+      reject: false,
+    });
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('run');
   });
@@ -63,10 +73,14 @@ describe('CLI Read-Only Commands', () => {
   });
 
   it('should view specific package version', async () => {
-    const result = await execa('node', [cliPath, 'view', 'lodash@4.17.21', 'version'], {
-      reject: false,
-      timeout: 30000,
-    });
+    const result = await execa(
+      'node',
+      [cliPath, 'view', 'lodash@4.17.21', 'version'],
+      {
+        reject: false,
+        timeout: 30000,
+      }
+    );
     expect(result.exitCode).toBe(0);
   });
 

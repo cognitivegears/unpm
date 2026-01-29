@@ -113,7 +113,9 @@ async function allowScriptsInit(): Promise<number> {
 }
 
 function printAllowScriptsHelp(): void {
-  logger.info(chalk.bold('unpm allow-scripts - Manage LavaMoat script allowlist'));
+  logger.info(
+    chalk.bold('unpm allow-scripts - Manage LavaMoat script allowlist')
+  );
   logger.info('');
   logger.info('Usage:');
   logger.info('  unpm allow-scripts <command> [options]');

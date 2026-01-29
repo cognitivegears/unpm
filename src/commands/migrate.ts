@@ -67,7 +67,9 @@ export async function migrate(args: string[]): Promise<number> {
         );
       }
     } else {
-      logger.info('  [dry-run] Would initialize lavamoat config in package.json');
+      logger.info(
+        '  [dry-run] Would initialize lavamoat config in package.json'
+      );
     }
   }
   logger.info('');
@@ -90,7 +92,9 @@ export async function migrate(args: string[]): Promise<number> {
         await appendFile(gitignorePath, '\n' + linesToAdd.join('\n') + '\n');
         logger.success('Updated .gitignore');
       } else {
-        logger.info(`  [dry-run] Would add to .gitignore: ${linesToAdd.join(', ')}`);
+        logger.info(
+          `  [dry-run] Would add to .gitignore: ${linesToAdd.join(', ')}`
+        );
       }
     }
   }

@@ -1,7 +1,10 @@
 import chalk from 'chalk';
 import { spawnPnpm } from '../utils/exec.js';
 import { logger } from '../utils/logger.js';
-import { validateStrictModeAction, removeStrictFlag } from '../security/strict-mode.js';
+import {
+  validateStrictModeAction,
+  removeStrictFlag,
+} from '../security/strict-mode.js';
 
 export async function run(args: string[]): Promise<number> {
   const pnpmArgs = ['run', ...args];
@@ -48,7 +51,10 @@ export async function exec(args: string[]): Promise<number> {
  * By default, dlx is BLOCKED and requires --allow-dlx to execute.
  * In strict mode, dlx is blocked entirely even with --allow-dlx.
  */
-export async function dlx(args: string[], globalArgs: string[] = []): Promise<number> {
+export async function dlx(
+  args: string[],
+  globalArgs: string[] = []
+): Promise<number> {
   // Check if --allow-dlx is present
   const hasAllowDlx = args.includes('--allow-dlx');
 
@@ -73,9 +79,13 @@ export async function dlx(args: string[], globalArgs: string[] = []): Promise<nu
     logger.error(chalk.red('  Error: dlx is blocked by default for security.'));
     logger.error('');
     logger.error(
-      chalk.yellow(`  dlx downloads and executes "${packageName}" directly from npm,`)
+      chalk.yellow(
+        `  dlx downloads and executes "${packageName}" directly from npm,`
+      )
     );
-    logger.error(chalk.yellow('  bypassing unpm\'s install script protections.'));
+    logger.error(
+      chalk.yellow("  bypassing unpm's install script protections.")
+    );
     logger.error('');
     logger.error('  To run this command, explicitly allow it:');
     logger.error(chalk.cyan(`    unpm dlx --allow-dlx ${args.join(' ')}`));

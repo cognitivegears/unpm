@@ -40,7 +40,9 @@ export async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-export async function readPackageJson(cwd?: string): Promise<PackageJson | null> {
+export async function readPackageJson(
+  cwd?: string
+): Promise<PackageJson | null> {
   const dir = cwd ?? process.cwd();
   const packageJsonPath = join(dir, 'package.json');
 

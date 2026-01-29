@@ -15,7 +15,9 @@ export const DEFAULT_MIN_RELEASE_AGE_MINUTES = 2880; // 2 days
  * - w: weeks
  */
 export function parseDuration(duration: string): number {
-  const match = duration.match(/^(\d+(?:\.\d+)?)\s*(m|min|h|hr|hours?|d|days?|w|weeks?)$/i);
+  const match = duration.match(
+    /^(\d+(?:\.\d+)?)\s*(m|min|h|hr|hours?|d|days?|w|weeks?)$/i
+  );
 
   if (!match || !match[1] || !match[2]) {
     // Try parsing as plain number (minutes)
@@ -23,7 +25,9 @@ export function parseDuration(duration: string): number {
     if (!isNaN(num)) {
       return num;
     }
-    throw new Error(`Invalid duration format: "${duration}". Use format like "2d", "4h", "30m", or a number of minutes.`);
+    throw new Error(
+      `Invalid duration format: "${duration}". Use format like "2d", "4h", "30m", or a number of minutes.`
+    );
   }
 
   const value = parseFloat(match[1]);
@@ -58,13 +62,13 @@ export function formatDuration(minutes: number): string {
   if (minutes < 60) {
     return `${minutes} minute${minutes === 1 ? '' : 's'}`;
   } else if (minutes < 60 * 24) {
-    const hours = Math.round(minutes / 60 * 10) / 10;
+    const hours = Math.round((minutes / 60) * 10) / 10;
     return `${hours} hour${hours === 1 ? '' : 's'}`;
   } else if (minutes < 60 * 24 * 7) {
-    const days = Math.round(minutes / (60 * 24) * 10) / 10;
+    const days = Math.round((minutes / (60 * 24)) * 10) / 10;
     return `${days} day${days === 1 ? '' : 's'}`;
   } else {
-    const weeks = Math.round(minutes / (60 * 24 * 7) * 10) / 10;
+    const weeks = Math.round((minutes / (60 * 24 * 7)) * 10) / 10;
     return `${weeks} week${weeks === 1 ? '' : 's'}`;
   }
 }
@@ -87,12 +91,16 @@ export interface ReleaseAgeConfig {
 /**
  * Get the release age configuration from package.json or defaults.
  */
-export async function getReleaseAgeConfig(cwd?: string): Promise<ReleaseAgeConfig> {
+export async function getReleaseAgeConfig(
+  cwd?: string
+): Promise<ReleaseAgeConfig> {
   const packageJson = await readPackageJson(cwd);
-  const unpmConfig = packageJson?.['unpm'] as {
-    minReleaseAge?: number | string;
-    minReleaseAgeExclude?: string[];
-  } | undefined;
+  const unpmConfig = packageJson?.['unpm'] as
+    | {
+        minReleaseAge?: number | string;
+        minReleaseAgeExclude?: string[];
+      }
+    | undefined;
 
   let minReleaseAge = DEFAULT_MIN_RELEASE_AGE_MINUTES;
 
@@ -164,7 +172,10 @@ export async function extractReleaseAgeFlags(
       }
       continue;
     }
-    if (arg.startsWith('--min-release-age=') || arg.startsWith('--minimum-release-age=')) {
+    if (
+      arg.startsWith('--min-release-age=') ||
+      arg.startsWith('--minimum-release-age=')
+    ) {
       const value = arg.split('=')[1];
       if (value) {
         minAgeMinutes = parseDuration(value);

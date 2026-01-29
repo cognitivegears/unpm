@@ -2,7 +2,10 @@ import chalk from 'chalk';
 import { spawnPnpm } from '../utils/exec.js';
 import { passthroughToNpm } from './passthrough.js';
 import { logger } from '../utils/logger.js';
-import { validateStrictModeAction, removeStrictFlag } from '../security/strict-mode.js';
+import {
+  validateStrictModeAction,
+  removeStrictFlag,
+} from '../security/strict-mode.js';
 
 /**
  * Manage package.json properties.
@@ -41,7 +44,10 @@ export async function edit(args: string[]): Promise<number> {
  * Use --allow-explore to enable this command.
  * In strict mode, this command is blocked entirely.
  */
-export async function explore(args: string[], globalArgs: string[] = []): Promise<number> {
+export async function explore(
+  args: string[],
+  globalArgs: string[] = []
+): Promise<number> {
   // Check if --allow-explore is present
   const hasAllowExplore = args.includes('--allow-explore');
 
@@ -63,7 +69,9 @@ export async function explore(args: string[], globalArgs: string[] = []): Promis
   if (!hasAllowExplore) {
     const packageName = args.find((arg) => !arg.startsWith('-')) ?? 'package';
     logger.error('');
-    logger.error(chalk.red('  Error: explore is blocked by default for security.'));
+    logger.error(
+      chalk.red('  Error: explore is blocked by default for security.')
+    );
     logger.error('');
     logger.error(
       chalk.yellow(`  explore spawns a shell in "${packageName}"'s directory,`)
@@ -71,13 +79,17 @@ export async function explore(args: string[], globalArgs: string[] = []): Promis
     logger.error(chalk.yellow('  allowing arbitrary command execution.'));
     logger.error('');
     logger.error('  To run this command, explicitly allow it:');
-    logger.error(chalk.cyan(`    unpm explore --allow-explore ${args.join(' ')}`));
+    logger.error(
+      chalk.cyan(`    unpm explore --allow-explore ${args.join(' ')}`)
+    );
     logger.error('');
     return 1;
   }
 
   // Remove our custom flags before passing to npm
-  const npmArgs = removeStrictFlag(args).filter((arg) => arg !== '--allow-explore');
+  const npmArgs = removeStrictFlag(args).filter(
+    (arg) => arg !== '--allow-explore'
+  );
   return passthroughToNpm('explore', npmArgs, false);
 }
 

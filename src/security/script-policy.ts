@@ -1,7 +1,11 @@
 import chalk from 'chalk';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { getLavamoatAllowScripts, readPackageJson, fileExists } from '../utils/config.js';
+import {
+  getLavamoatAllowScripts,
+  readPackageJson,
+  fileExists,
+} from '../utils/config.js';
 import { logger } from '../utils/logger.js';
 import { execPnpm } from '../utils/exec.js';
 
@@ -36,7 +40,13 @@ export async function isPackageAllowedToRunScripts(
   cwd?: string
 ): Promise<boolean> {
   const packageJson = await readPackageJson(cwd);
-  const unpmConfig = packageJson?.['unpm'] as { trustedPackages?: string[]; lavamoatEnabled?: boolean; allowDependencyScripts?: boolean } | undefined;
+  const unpmConfig = packageJson?.['unpm'] as
+    | {
+        trustedPackages?: string[];
+        lavamoatEnabled?: boolean;
+        allowDependencyScripts?: boolean;
+      }
+    | undefined;
 
   // Check if all dependency scripts are allowed (not recommended)
   if (unpmConfig?.allowDependencyScripts === true) {
@@ -70,7 +80,7 @@ export function printScriptBlockedWarning(packageName: string): void {
     )
   );
   logger.warn('');
-  logger.warn('  To allow this package\'s scripts, run:');
+  logger.warn("  To allow this package's scripts, run:");
   logger.warn(chalk.cyan(`    unpm allow-scripts add ${packageName}`));
   logger.warn('');
 }
@@ -78,7 +88,9 @@ export function printScriptBlockedWarning(packageName: string): void {
 /**
  * Get install scripts from the local package.json.
  */
-export async function getLocalPackageScripts(cwd?: string): Promise<PackageScripts> {
+export async function getLocalPackageScripts(
+  cwd?: string
+): Promise<PackageScripts> {
   const packageJson = await readPackageJson(cwd);
   if (!packageJson?.scripts) {
     return {};
@@ -141,7 +153,9 @@ export async function runLocalScripts(
 async function runScript(scriptName: string, cwd?: string): Promise<void> {
   const result = await execPnpm(['run', scriptName], { cwd, stdio: 'inherit' });
   if (result.exitCode !== 0) {
-    throw new Error(`Script "${scriptName}" failed with exit code ${result.exitCode}`);
+    throw new Error(
+      `Script "${scriptName}" failed with exit code ${result.exitCode}`
+    );
   }
 }
 
@@ -172,7 +186,9 @@ export async function getPackagesWithScripts(cwd?: string): Promise<string[]> {
         for (const scopedEntry of scopedEntries) {
           if (!scopedEntry.isDirectory()) continue;
           const pkgName = `${entry.name}/${scopedEntry.name}`;
-          if (await packageHasInstallScripts(join(scopePath, scopedEntry.name))) {
+          if (
+            await packageHasInstallScripts(join(scopePath, scopedEntry.name))
+          ) {
             packagesWithScripts.push(pkgName);
           }
         }
@@ -219,7 +235,9 @@ export async function runAllowedPackageScripts(cwd?: string): Promise<void> {
     return;
   }
 
-  logger.debug(`Found ${packagesWithScripts.length} packages with install scripts`);
+  logger.debug(
+    `Found ${packagesWithScripts.length} packages with install scripts`
+  );
 
   const blockedPackages: string[] = [];
 
@@ -242,15 +260,21 @@ export async function runAllowedPackageScripts(cwd?: string): Promise<void> {
   // Warn about blocked packages
   if (blockedPackages.length > 0) {
     logger.warn('');
-    logger.warn(chalk.yellow(`  ${blockedPackages.length} package(s) have install scripts that were blocked:`));
+    logger.warn(
+      chalk.yellow(
+        `  ${blockedPackages.length} package(s) have install scripts that were blocked:`
+      )
+    );
     for (const pkg of blockedPackages.slice(0, 10)) {
       logger.warn(chalk.yellow(`    - ${pkg}`));
     }
     if (blockedPackages.length > 10) {
-      logger.warn(chalk.yellow(`    ... and ${blockedPackages.length - 10} more`));
+      logger.warn(
+        chalk.yellow(`    ... and ${blockedPackages.length - 10} more`)
+      );
     }
     logger.warn('');
-    logger.warn('  To allow a package\'s scripts, run:');
+    logger.warn("  To allow a package's scripts, run:");
     logger.warn(chalk.cyan('    unpm allow-scripts add <package-name>'));
     logger.warn('');
   }

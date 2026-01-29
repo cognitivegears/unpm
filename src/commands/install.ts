@@ -1,6 +1,10 @@
 import chalk from 'chalk';
 import { spawnPnpm } from '../utils/exec.js';
-import { mapNpmFlagsToPnpm, mapNpmCiToPnpm, extractPackagesFromArgs } from '../mappers/args.js';
+import {
+  mapNpmFlagsToPnpm,
+  mapNpmCiToPnpm,
+  extractPackagesFromArgs,
+} from '../mappers/args.js';
 import {
   runLocalScripts,
   runAllowedPackageScripts,
@@ -39,7 +43,9 @@ async function handleScriptFlags(
   if (hasDeprecatedBypass) {
     logger.warn('');
     logger.warn(
-      chalk.yellow('  Warning: --ignore-scripts=false and --no-ignore-scripts are deprecated.')
+      chalk.yellow(
+        '  Warning: --ignore-scripts=false and --no-ignore-scripts are deprecated.'
+      )
     );
     logger.warn('');
     logger.warn('  To enable dependency scripts, use:');
@@ -57,7 +63,9 @@ async function handleScriptFlags(
     const validation = await validateStrictModeAction('force-scripts', allArgs);
     if (!validation.allowed) {
       logger.error('');
-      logger.error(chalk.red('  Error: --force-scripts is blocked in strict mode.'));
+      logger.error(
+        chalk.red('  Error: --force-scripts is blocked in strict mode.')
+      );
       logger.error('');
       logger.error(chalk.dim(`  ${validation.reason}`));
       logger.error('');
@@ -65,8 +73,14 @@ async function handleScriptFlags(
     }
 
     logger.warn('');
-    logger.warn(chalk.yellow('  Warning: --force-scripts enabled. Dependency scripts will run.'));
-    logger.warn(chalk.dim('  Only use this flag if you trust all dependencies.'));
+    logger.warn(
+      chalk.yellow(
+        '  Warning: --force-scripts enabled. Dependency scripts will run.'
+      )
+    );
+    logger.warn(
+      chalk.dim('  Only use this flag if you trust all dependencies.')
+    );
     logger.warn('');
     return { allowed: true, forceScripts: true };
   }
@@ -78,13 +92,14 @@ async function handleScriptFlags(
  * Remove unpm-only flags from the args before passing to pnpm.
  */
 function removeUnpmFlags(args: string[]): string[] {
-  return args.filter((arg) =>
-    arg !== '--force-scripts' &&
-    arg !== '--ignore-scripts=false' &&
-    arg !== '--no-ignore-scripts' &&
-    arg !== '--strict' &&
-    arg !== '--allow-dlx' &&
-    arg !== '--allow-explore'
+  return args.filter(
+    (arg) =>
+      arg !== '--force-scripts' &&
+      arg !== '--ignore-scripts=false' &&
+      arg !== '--no-ignore-scripts' &&
+      arg !== '--strict' &&
+      arg !== '--allow-dlx' &&
+      arg !== '--allow-explore'
   );
 }
 
@@ -97,13 +112,17 @@ async function getEffectiveReleaseAgeConfig(
   cwd?: string
 ): Promise<{ cleanedArgs: string[]; releaseAgeConfig: ReleaseAgeFlagsResult }> {
   const strictConfig = await getStrictModeConfig(args, cwd);
-  let { cleanedArgs, releaseAgeFlags } = await extractReleaseAgeFlags(args, cwd);
+  let { cleanedArgs, releaseAgeFlags } = await extractReleaseAgeFlags(
+    args,
+    cwd
+  );
 
   // In strict mode, enforce minimum 7 days if not explicitly disabled
   if (strictConfig.enabled && !releaseAgeFlags.disabled) {
     const strictMinAge = strictConfig.minReleaseAgeDays * 24 * 60; // Convert days to minutes
     if (releaseAgeFlags.minAgeMinutes < strictMinAge) {
-      const { formatDurationForPnpm } = await import('../security/release-age.js');
+      const { formatDurationForPnpm } =
+        await import('../security/release-age.js');
       const durationStr = formatDurationForPnpm(strictMinAge);
       releaseAgeFlags = {
         ...releaseAgeFlags,
@@ -111,7 +130,9 @@ async function getEffectiveReleaseAgeConfig(
         flags: [`--config.minimum-release-age=${durationStr}`],
         envVars: {},
       };
-      logger.debug(`Strict mode: Enforcing minimum release age of ${strictConfig.minReleaseAgeDays} days`);
+      logger.debug(
+        `Strict mode: Enforcing minimum release age of ${strictConfig.minReleaseAgeDays} days`
+      );
     }
   }
 
@@ -125,7 +146,10 @@ async function getEffectiveReleaseAgeConfig(
  * - Runs local package scripts (preinstall, postinstall, etc.) after installation
  * - Runs scripts for packages in the allowlist
  */
-export async function install(args: string[], globalArgs: string[] = []): Promise<number> {
+export async function install(
+  args: string[],
+  globalArgs: string[] = []
+): Promise<number> {
   const allArgs = [...globalArgs, ...args];
 
   // Validate lockfile status (warn in normal mode, error in strict mode)
@@ -135,7 +159,8 @@ export async function install(args: string[], globalArgs: string[] = []): Promis
   }
 
   // Extract release age config (with strict mode adjustments)
-  const { cleanedArgs, releaseAgeConfig } = await getEffectiveReleaseAgeConfig(allArgs);
+  const { cleanedArgs, releaseAgeConfig } =
+    await getEffectiveReleaseAgeConfig(allArgs);
 
   const { packages, flags } = extractPackagesFromArgs(cleanedArgs);
 
@@ -154,7 +179,9 @@ export async function install(args: string[], globalArgs: string[] = []): Promis
 
   // Log security info
   if (releaseAgeConfig.minAgeMinutes > 0) {
-    logger.debug(`Minimum release age: ${formatDuration(releaseAgeConfig.minAgeMinutes)}`);
+    logger.debug(
+      `Minimum release age: ${formatDuration(releaseAgeConfig.minAgeMinutes)}`
+    );
   }
 
   // Run preinstall scripts from local package.json
@@ -168,7 +195,12 @@ export async function install(args: string[], globalArgs: string[] = []): Promis
   }
 
   // Run pnpm install with release age flags
-  const pnpmArgs = ['install', ...packages, ...removeStrictFlag(mappedFlags), ...releaseAgeConfig.flags];
+  const pnpmArgs = [
+    'install',
+    ...packages,
+    ...removeStrictFlag(mappedFlags),
+    ...releaseAgeConfig.flags,
+  ];
   const result = await spawnPnpm(pnpmArgs);
 
   if (result.exitCode !== 0) {
@@ -196,7 +228,10 @@ export async function install(args: string[], globalArgs: string[] = []): Promis
  * CI install - frozen lockfile with security protections.
  * In strict mode, always uses --frozen-lockfile.
  */
-export async function ci(args: string[], globalArgs: string[] = []): Promise<number> {
+export async function ci(
+  args: string[],
+  globalArgs: string[] = []
+): Promise<number> {
   const allArgs = [...globalArgs, ...args];
 
   // Validate lockfile status (warn in normal mode, error in strict mode)
@@ -206,7 +241,8 @@ export async function ci(args: string[], globalArgs: string[] = []): Promise<num
   }
 
   // Extract release age config (with strict mode adjustments)
-  const { cleanedArgs, releaseAgeConfig } = await getEffectiveReleaseAgeConfig(allArgs);
+  const { cleanedArgs, releaseAgeConfig } =
+    await getEffectiveReleaseAgeConfig(allArgs);
 
   // Handle script flags
   const { flags } = extractPackagesFromArgs(cleanedArgs);
@@ -239,7 +275,11 @@ export async function ci(args: string[], globalArgs: string[] = []): Promise<num
   }
 
   // Run pnpm install with frozen lockfile and release age flags
-  const pnpmArgs = ['install', ...removeStrictFlag(mappedArgs), ...releaseAgeConfig.flags];
+  const pnpmArgs = [
+    'install',
+    ...removeStrictFlag(mappedArgs),
+    ...releaseAgeConfig.flags,
+  ];
   const result = await spawnPnpm(pnpmArgs);
 
   if (result.exitCode !== 0) {
@@ -263,7 +303,10 @@ export async function ci(args: string[], globalArgs: string[] = []): Promise<num
 /**
  * Add packages with security protections.
  */
-export async function add(args: string[], globalArgs: string[] = []): Promise<number> {
+export async function add(
+  args: string[],
+  globalArgs: string[] = []
+): Promise<number> {
   const allArgs = [...globalArgs, ...args];
 
   // Validate lockfile status (warn in normal mode, error in strict mode)
@@ -273,7 +316,8 @@ export async function add(args: string[], globalArgs: string[] = []): Promise<nu
   }
 
   // Extract release age config (with strict mode adjustments)
-  const { cleanedArgs, releaseAgeConfig } = await getEffectiveReleaseAgeConfig(allArgs);
+  const { cleanedArgs, releaseAgeConfig } =
+    await getEffectiveReleaseAgeConfig(allArgs);
 
   const { packages, flags } = extractPackagesFromArgs(cleanedArgs);
 
@@ -291,7 +335,12 @@ export async function add(args: string[], globalArgs: string[] = []): Promise<nu
   }
 
   // Run pnpm add with release age flags
-  const pnpmArgs = ['add', ...packages, ...removeStrictFlag(mappedFlags), ...releaseAgeConfig.flags];
+  const pnpmArgs = [
+    'add',
+    ...packages,
+    ...removeStrictFlag(mappedFlags),
+    ...releaseAgeConfig.flags,
+  ];
   const result = await spawnPnpm(pnpmArgs);
 
   if (result.exitCode !== 0) {
@@ -324,7 +373,10 @@ export async function remove(args: string[]): Promise<number> {
 /**
  * Update packages with security protections.
  */
-export async function update(args: string[], globalArgs: string[] = []): Promise<number> {
+export async function update(
+  args: string[],
+  globalArgs: string[] = []
+): Promise<number> {
   const allArgs = [...globalArgs, ...args];
 
   // Validate lockfile status (warn in normal mode, error in strict mode)
@@ -334,7 +386,8 @@ export async function update(args: string[], globalArgs: string[] = []): Promise
   }
 
   // Extract release age config (with strict mode adjustments)
-  const { cleanedArgs, releaseAgeConfig } = await getEffectiveReleaseAgeConfig(allArgs);
+  const { cleanedArgs, releaseAgeConfig } =
+    await getEffectiveReleaseAgeConfig(allArgs);
 
   // Handle script flags
   const { flags } = extractPackagesFromArgs(cleanedArgs);
@@ -351,7 +404,11 @@ export async function update(args: string[], globalArgs: string[] = []): Promise
   }
 
   // Run pnpm update with release age flags
-  const pnpmArgs = ['update', ...removeStrictFlag(mappedArgs), ...releaseAgeConfig.flags];
+  const pnpmArgs = [
+    'update',
+    ...removeStrictFlag(mappedArgs),
+    ...releaseAgeConfig.flags,
+  ];
   const result = await spawnPnpm(pnpmArgs);
 
   if (result.exitCode !== 0) {
@@ -375,7 +432,10 @@ export async function update(args: string[], globalArgs: string[] = []): Promise
  * Install packages and then run tests.
  * Equivalent to: npm install && npm test
  */
-export async function installTest(args: string[], globalArgs: string[] = []): Promise<number> {
+export async function installTest(
+  args: string[],
+  globalArgs: string[] = []
+): Promise<number> {
   const installResult = await install(args, globalArgs);
   if (installResult !== 0) {
     return installResult;
@@ -389,7 +449,10 @@ export async function installTest(args: string[], globalArgs: string[] = []): Pr
  * CI install and then run tests.
  * Equivalent to: npm ci && npm test
  */
-export async function installCiTest(args: string[], globalArgs: string[] = []): Promise<number> {
+export async function installCiTest(
+  args: string[],
+  globalArgs: string[] = []
+): Promise<number> {
   const ciResult = await ci(args, globalArgs);
   if (ciResult !== 0) {
     return ciResult;
