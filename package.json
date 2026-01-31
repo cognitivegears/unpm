@@ -1,6 +1,6 @@
 {
   "name": "@depgate/unpm",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "An npm wrapper that delegates to pnpm for improved security",
   "repository": {
     "type": "git",
