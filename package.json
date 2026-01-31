@@ -4,7 +4,7 @@
   "description": "An npm wrapper that delegates to pnpm for improved security",
   "repository": {
     "type": "git",
-    "url": "https://github.com/depgate/unpm"
+    "url": "https://github.com/cognitivegears/unpm"
   },
   "type": "module",
   "main": "dist/index.js",
