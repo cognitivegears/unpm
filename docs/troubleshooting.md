@@ -84,15 +84,66 @@ In strict mode, `--force-scripts` is not allowed. Options:
    unpm allow-scripts add <package>
    ```
 
-## Lockfile conflicts
+## Lockfile Issues
+
+### "Use unpm or pnpm instead of npm"
+
+This message appears after running `unpm migrate`. Your project is now in post-migration mode:
+
+```bash
+# Use unpm or pnpm instead
+unpm install lodash
+# or
+pnpm add lodash
+```
+
+To revert to npm (not recommended):
+```bash
+rm pnpm-lock.yaml
+# Edit package.json to remove the "preinstall" script
+npm install
+```
+
+### Lockfile sync warnings
+
+In pre-migration mode, you may see sync warnings:
+
+```
+Warning: Could not import package-lock.json. Continuing with fresh resolution.
+```
+
+This is usually harmless—pnpm will resolve dependencies fresh. To fix:
+1. Ensure `package-lock.json` is valid JSON
+2. Check for npm version compatibility issues
+3. Run `npm install` to regenerate a clean lockfile
+
+### Lockfile sync errors in strict mode
+
+In strict mode, sync warnings become errors:
+
+```
+Error: Could not import package-lock.json. Continuing with fresh resolution.
+In strict mode, lockfile sync must succeed.
+```
+
+Options:
+1. Fix the underlying lockfile issue
+2. Run without strict mode for this operation
+3. Run `unpm migrate` to switch to pnpm-only mode
+
+### Both lockfiles exist
 
 If you have both `package-lock.json` and `pnpm-lock.yaml`:
 
 ```bash
+# Option 1: Complete migration (recommended)
 unpm migrate
+
+# Option 2: Remove pnpm lockfile to stay in pre-migration mode
+rm pnpm-lock.yaml
 ```
 
-This properly converts the npm lockfile to pnpm format.
+The presence of `pnpm-lock.yaml` indicates post-migration mode.
 
 ## Command not working as expected
 

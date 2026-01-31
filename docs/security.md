@@ -174,6 +174,51 @@ If knip is installed locally as a dev dependency, UNPM uses it. Otherwise, it ru
 - **Cleaner codebase**: Easier to audit and maintain
 - **Security hygiene**: Part of a defense-in-depth strategy
 
+## Lockfile Security
+
+### Bidirectional Sync (Pre-Migration)
+
+Before running `unpm migrate`, UNPM syncs with npm's `package-lock.json` to allow gradual adoption:
+
+```
+unpm install lodash
+    │
+    ▼
+1. pnpm import (package-lock.json → temp pnpm-lock.yaml)
+    │
+    ▼
+2. pnpm add lodash --ignore-scripts --minimum-release-age=2d
+    │
+    ▼
+3. Export back to package-lock.json
+    │
+    ▼
+4. Delete temp pnpm-lock.yaml
+```
+
+**Security is preserved during sync:**
+- `--ignore-scripts` is always applied
+- `--minimum-release-age` is enforced
+- All other security features remain active
+
+### Strict Mode Sync Behavior
+
+In strict mode, lockfile sync errors are fatal (not warnings):
+
+```bash
+# In strict mode, sync failures block the command
+UNPM_STRICT=true unpm install
+# Error: Could not import package-lock.json. Continuing with fresh resolution.
+# In strict mode, lockfile sync must succeed.
+```
+
+### Post-Migration Lockfile
+
+After `unpm migrate`:
+- `pnpm-lock.yaml` persists as the migration marker
+- npm install/update is blocked via preinstall script
+- `.pnpmrc` is created with secure defaults for direct pnpm usage
+
 ## LavaMoat Integration
 
 UNPM integrates with [@lavamoat/allow-scripts](https://github.com/LavaMoat/LavaMoat/tree/main/packages/allow-scripts) for managing script permissions. If you already use LavaMoat, UNPM will respect your existing configuration.

@@ -1,22 +1,39 @@
 # Migrating from npm
 
-UNPM is designed as a drop-in replacement for npm. Migration is straightforward.
+UNPM is designed as a drop-in replacement for npm. You can migrate gradually or all at once.
 
-## Quick Migration
+## Two Migration Approaches
 
-Simply replace `npm` with `unpm` in your commands:
+### 1. Gradual Migration (Recommended)
+
+Start using unpm immediately without any setup. npm and unpm work interchangeably:
 
 ```bash
-# Instead of: npm install
-unpm install
+# Use unpm for secure installs
+unpm install lodash
 
-# Instead of: npm run build
-unpm run build
+# Team members without unpm can still use npm
+npm install express
+
+# Both lockfiles stay in sync automatically
+unpm add axios
 ```
 
-## Automatic Migration
+**How it works:**
+- Before migration, UNPM syncs with `package-lock.json`
+- Each unpm command: imports package-lock.json → runs securely → exports back
+- npm commands work normally with the same package-lock.json
+- All UNPM security features (script blocking, release age) are active
 
-UNPM provides a migration command to convert existing npm projects:
+When your team is ready to fully commit:
+
+```bash
+unpm migrate
+```
+
+### 2. Immediate Migration
+
+Convert your project all at once:
 
 ```bash
 unpm migrate
@@ -24,9 +41,12 @@ unpm migrate
 
 This will:
 1. Convert `package-lock.json` to `pnpm-lock.yaml`
-2. Initialize LavaMoat configuration
-3. Add UNPM configuration to `package.json`
-4. Install dependencies securely
+2. Delete `package-lock.json`
+3. Set `packageManager` field in package.json (for corepack)
+4. Add preinstall script to block npm
+5. Create `.pnpmrc` with secure defaults
+6. Initialize LavaMoat configuration
+7. Install dependencies securely
 
 ### Migration Options
 
@@ -37,6 +57,16 @@ unpm migrate --dry-run
 # Skip LavaMoat configuration
 unpm migrate --skip-lavamoat
 ```
+
+## Pre-Migration vs Post-Migration
+
+| Aspect | Pre-Migration | Post-Migration |
+|--------|---------------|----------------|
+| Lockfile | `package-lock.json` | `pnpm-lock.yaml` |
+| npm commands | Work normally | Blocked with helpful message |
+| unpm commands | Sync with npm lockfile | Use pnpm lockfile directly |
+| Team adoption | Gradual (optional) | Required |
+| Performance | Slight overhead from sync | Full pnpm speed |
 
 ## Shell Alias (Optional)
 
@@ -98,17 +128,67 @@ Common packages that need script permissions:
 
 ## Lockfile Handling
 
-If you have both `package-lock.json` and `pnpm-lock.yaml`:
+### Before Migration
+
+UNPM automatically syncs lockfiles in pre-migration mode:
 
 ```bash
-unpm migrate
+# You have: package-lock.json
+unpm install lodash
+# Behind the scenes:
+# 1. pnpm import (creates temp pnpm-lock.yaml)
+# 2. pnpm add lodash --ignore-scripts
+# 3. Export back to package-lock.json
+# 4. Delete temp pnpm-lock.yaml
+# Result: Only package-lock.json exists, npm still works
 ```
 
-This properly converts the npm lockfile to pnpm format.
+### After Migration
 
-To keep using npm's lockfile format alongside pnpm (not recommended):
+After running `unpm migrate`:
+- `pnpm-lock.yaml` is the only lockfile
+- `package-lock.json` is deleted
+- npm install/update commands are blocked with a helpful message:
+  ```
+  Use unpm or pnpm instead of npm
+  ```
+
+### What Migration Creates
+
+The `unpm migrate` command creates/modifies:
+
+1. **`pnpm-lock.yaml`** - Converted from package-lock.json
+2. **`packageManager` field** - For corepack enforcement
+   ```json
+   {
+     "packageManager": "pnpm@9.15.0"
+   }
+   ```
+3. **`preinstall` script** - Blocks npm with clear message
+   ```json
+   {
+     "scripts": {
+       "preinstall": "node -e \"if(!process.env.npm_execpath?.includes('pnpm')){console.error('Use unpm or pnpm instead of npm');process.exit(1)}\""
+     }
+   }
+   ```
+4. **`.pnpmrc`** - Secure pnpm defaults for direct pnpm usage
+   ```ini
+   ignore-scripts=true
+   minimum-release-age=2d
+   ```
+
+### Reverting Migration
+
+To revert to npm-only workflow:
 
 ```bash
-# Just install without migration
-unpm install
+# Remove pnpm-lock.yaml (triggers pre-migration mode)
+rm pnpm-lock.yaml
+
+# Remove the blocking preinstall script
+# Edit package.json to remove "preinstall" from scripts
+
+# Generate fresh package-lock.json
+npm install
 ```

@@ -12,7 +12,15 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execa } from 'execa';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdtemp, writeFile, rm, mkdir, readdir } from 'node:fs/promises';
+import {
+  mkdtemp,
+  writeFile,
+  rm,
+  mkdir,
+  readdir,
+  readFile,
+  access,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -151,6 +159,17 @@ describe.skipIf(!HEAVY_TESTS)('Heavy Integration Tests - Strict Mode', () => {
       })
     );
 
+    // Create package-lock.json to pass strict mode lockfile validation
+    await writeFile(
+      join(projectDir, 'package-lock.json'),
+      JSON.stringify({
+        name: 'force-scripts-test',
+        version: '1.0.0',
+        lockfileVersion: 3,
+        packages: {},
+      })
+    );
+
     const result = await execa(
       'node',
       [cliPath, '--strict', 'install', '--force-scripts'],
@@ -201,6 +220,17 @@ describe.skipIf(!HEAVY_TESTS)('Heavy Integration Tests - Strict Mode', () => {
       JSON.stringify({
         name: 'release-age-test',
         version: '1.0.0',
+      })
+    );
+
+    // Create package-lock.json to pass strict mode lockfile validation
+    await writeFile(
+      join(projectDir, 'package-lock.json'),
+      JSON.stringify({
+        name: 'release-age-test',
+        version: '1.0.0',
+        lockfileVersion: 3,
+        packages: {},
       })
     );
 
@@ -386,5 +416,403 @@ describe.skipIf(!HEAVY_TESTS)(
       // ci may fail without proper lockfile, but command should execute
       expect(result.exitCode).toBeLessThanOrEqual(1);
     }, 60000);
+  }
+);
+
+// Helper to check if a file exists
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+describe.skipIf(!HEAVY_TESTS)(
+  'Heavy Integration Tests - Lockfile Sync (Pre-Migration)',
+  () => {
+    let tempDir: string;
+
+    beforeAll(async () => {
+      tempDir = await mkdtemp(join(tmpdir(), 'unpm-lockfile-sync-'));
+    });
+
+    afterAll(async () => {
+      if (tempDir) {
+        await rm(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should sync package-lock.json in pre-migration mode', async () => {
+      const projectDir = join(tempDir, 'pre-migration-sync');
+      await mkdir(projectDir, { recursive: true });
+
+      // Create package.json
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'pre-migration-test',
+          version: '1.0.0',
+        })
+      );
+
+      // Create a minimal package-lock.json (npm format)
+      await writeFile(
+        join(projectDir, 'package-lock.json'),
+        JSON.stringify({
+          name: 'pre-migration-test',
+          version: '1.0.0',
+          lockfileVersion: 3,
+          requires: true,
+          packages: {
+            '': {
+              name: 'pre-migration-test',
+              version: '1.0.0',
+            },
+          },
+        })
+      );
+
+      // Run unpm install in pre-migration mode
+      const result = await execa('node', [cliPath, 'add', 'is-odd@3.0.1'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 120000,
+      });
+
+      expect(result.exitCode).toBe(0);
+
+      // Verify package-lock.json still exists (pre-migration keeps it)
+      const hasPackageLock = await fileExists(
+        join(projectDir, 'package-lock.json')
+      );
+      expect(hasPackageLock).toBe(true);
+
+      // Verify pnpm-lock.yaml was cleaned up (pre-migration removes it)
+      const hasPnpmLock = await fileExists(join(projectDir, 'pnpm-lock.yaml'));
+      expect(hasPnpmLock).toBe(false);
+
+      // Verify package was installed
+      const nodeModules = await readdir(join(projectDir, 'node_modules')).catch(
+        () => []
+      );
+      expect(nodeModules).toContain('is-odd');
+    }, 120000);
+
+    it('should work with fresh project (no lockfile)', async () => {
+      const projectDir = join(tempDir, 'fresh-project');
+      await mkdir(projectDir, { recursive: true });
+
+      // Create only package.json, no lockfile
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'fresh-project-test',
+          version: '1.0.0',
+        })
+      );
+
+      // Run unpm add in pre-migration mode (no existing lockfile)
+      const result = await execa('node', [cliPath, 'add', 'is-odd@3.0.1'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 120000,
+      });
+
+      expect(result.exitCode).toBe(0);
+
+      // Should create package-lock.json (exported from pnpm)
+      const hasPackageLock = await fileExists(
+        join(projectDir, 'package-lock.json')
+      );
+      expect(hasPackageLock).toBe(true);
+
+      // pnpm-lock.yaml should be cleaned up
+      const hasPnpmLock = await fileExists(join(projectDir, 'pnpm-lock.yaml'));
+      expect(hasPnpmLock).toBe(false);
+    }, 120000);
+
+    it('should preserve security in pre-migration mode', async () => {
+      const projectDir = join(tempDir, 'security-preserved');
+      await mkdir(projectDir, { recursive: true });
+
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'security-test',
+          version: '1.0.0',
+        })
+      );
+
+      // Run with verbose to see security flags
+      const result = await execa(
+        'node',
+        [cliPath, '-v', 'add', 'is-odd@3.0.1'],
+        {
+          reject: false,
+          cwd: projectDir,
+          timeout: 120000,
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+
+      // Check that security flags are present in output
+      const output = result.stdout + result.stderr;
+      expect(output).toContain('--ignore-scripts');
+    }, 120000);
+  }
+);
+
+describe.skipIf(!HEAVY_TESTS)(
+  'Heavy Integration Tests - Migration Command',
+  () => {
+    let tempDir: string;
+
+    beforeAll(async () => {
+      tempDir = await mkdtemp(join(tmpdir(), 'unpm-migration-'));
+    });
+
+    afterAll(async () => {
+      if (tempDir) {
+        await rm(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should complete full migration', async () => {
+      const projectDir = join(tempDir, 'full-migration');
+      await mkdir(projectDir, { recursive: true });
+
+      // Create package.json with dependencies
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'migration-test',
+          version: '1.0.0',
+          dependencies: {
+            'is-odd': '^3.0.1',
+          },
+        })
+      );
+
+      // Create package-lock.json
+      await writeFile(
+        join(projectDir, 'package-lock.json'),
+        JSON.stringify({
+          name: 'migration-test',
+          version: '1.0.0',
+          lockfileVersion: 3,
+          requires: true,
+          packages: {
+            '': {
+              name: 'migration-test',
+              version: '1.0.0',
+              dependencies: {
+                'is-odd': '^3.0.1',
+              },
+            },
+          },
+        })
+      );
+
+      // Run migration
+      const result = await execa('node', [cliPath, 'migrate'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 180000,
+      });
+
+      expect(result.exitCode).toBe(0);
+
+      // Verify pnpm-lock.yaml exists (migration marker)
+      const hasPnpmLock = await fileExists(join(projectDir, 'pnpm-lock.yaml'));
+      expect(hasPnpmLock).toBe(true);
+
+      // Verify package-lock.json was deleted
+      const hasPackageLock = await fileExists(
+        join(projectDir, 'package-lock.json')
+      );
+      expect(hasPackageLock).toBe(false);
+
+      // Verify package.json was updated
+      const pkgJson = JSON.parse(
+        await readFile(join(projectDir, 'package.json'), 'utf-8')
+      );
+
+      // Check packageManager field
+      expect(pkgJson.packageManager).toBeDefined();
+      expect(pkgJson.packageManager).toContain('pnpm@');
+
+      // Check preinstall script
+      expect(pkgJson.scripts?.preinstall).toBeDefined();
+      expect(pkgJson.scripts.preinstall).toContain('pnpm');
+
+      // Verify .pnpmrc was created
+      const hasPnpmrc = await fileExists(join(projectDir, '.pnpmrc'));
+      expect(hasPnpmrc).toBe(true);
+
+      // Check .pnpmrc contents
+      const pnpmrc = await readFile(join(projectDir, '.pnpmrc'), 'utf-8');
+      expect(pnpmrc).toContain('ignore-scripts=true');
+      expect(pnpmrc).toContain('minimum-release-age=2d');
+    }, 180000);
+
+    it('should block npm after migration', async () => {
+      const projectDir = join(tempDir, 'npm-blocked');
+      await mkdir(projectDir, { recursive: true });
+
+      // Create package.json with a dependency so npm actually tries to install
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'npm-blocked-test',
+          version: '1.0.0',
+          dependencies: {
+            'is-odd': '^3.0.1',
+          },
+        })
+      );
+
+      // Create package-lock.json
+      await writeFile(
+        join(projectDir, 'package-lock.json'),
+        JSON.stringify({
+          name: 'npm-blocked-test',
+          version: '1.0.0',
+          lockfileVersion: 3,
+          packages: {},
+        })
+      );
+
+      // Run migration
+      const migrateResult = await execa('node', [cliPath, 'migrate'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 120000,
+      });
+
+      expect(migrateResult.exitCode).toBe(0);
+
+      // Read updated package.json to verify preinstall script
+      const pkgJson = JSON.parse(
+        await readFile(join(projectDir, 'package.json'), 'utf-8')
+      );
+      expect(pkgJson.scripts?.preinstall).toBeDefined();
+
+      // Try to run npm install - should be blocked by preinstall script
+      // Note: npm install runs preinstall before doing anything
+      const npmResult = await execa('npm', ['install'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 30000,
+      });
+
+      // npm should fail due to preinstall script
+      expect(npmResult.exitCode).not.toBe(0);
+      expect(npmResult.stderr + npmResult.stdout).toContain(
+        'Use unpm or pnpm instead of npm'
+      );
+    }, 150000);
+
+    it('should support dry-run mode', async () => {
+      const projectDir = join(tempDir, 'dry-run-test');
+      await mkdir(projectDir, { recursive: true });
+
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'dry-run-test',
+          version: '1.0.0',
+        })
+      );
+
+      await writeFile(
+        join(projectDir, 'package-lock.json'),
+        JSON.stringify({
+          name: 'dry-run-test',
+          version: '1.0.0',
+          lockfileVersion: 3,
+          packages: {},
+        })
+      );
+
+      // Run migration with --dry-run
+      const result = await execa('node', [cliPath, 'migrate', '--dry-run'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 30000,
+      });
+
+      expect(result.exitCode).toBe(0);
+
+      // Verify nothing was changed
+      const hasPackageLock = await fileExists(
+        join(projectDir, 'package-lock.json')
+      );
+      expect(hasPackageLock).toBe(true);
+
+      const hasPnpmLock = await fileExists(join(projectDir, 'pnpm-lock.yaml'));
+      expect(hasPnpmLock).toBe(false);
+    }, 30000);
+  }
+);
+
+describe.skipIf(!HEAVY_TESTS)(
+  'Heavy Integration Tests - Post-Migration Mode',
+  () => {
+    let tempDir: string;
+
+    beforeAll(async () => {
+      tempDir = await mkdtemp(join(tmpdir(), 'unpm-post-migration-'));
+    });
+
+    afterAll(async () => {
+      if (tempDir) {
+        await rm(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should use pnpm-lock.yaml directly when it exists', async () => {
+      const projectDir = join(tempDir, 'post-migration');
+      await mkdir(projectDir, { recursive: true });
+
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'post-migration-test',
+          version: '1.0.0',
+        })
+      );
+
+      // Create pnpm-lock.yaml to simulate post-migration state
+      await writeFile(
+        join(projectDir, 'pnpm-lock.yaml'),
+        `lockfileVersion: '9.0'
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+`
+      );
+
+      // Run install in post-migration mode
+      const result = await execa('node', [cliPath, 'add', 'is-odd@3.0.1'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 120000,
+      });
+
+      expect(result.exitCode).toBe(0);
+
+      // Verify pnpm-lock.yaml still exists
+      const hasPnpmLock = await fileExists(join(projectDir, 'pnpm-lock.yaml'));
+      expect(hasPnpmLock).toBe(true);
+
+      // No package-lock.json should be created in post-migration mode
+      const hasPackageLock = await fileExists(
+        join(projectDir, 'package-lock.json')
+      );
+      expect(hasPackageLock).toBe(false);
+    }, 120000);
   }
 );

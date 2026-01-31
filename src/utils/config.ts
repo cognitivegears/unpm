@@ -117,3 +117,11 @@ export async function hasPnpmLock(cwd?: string): Promise<boolean> {
   const dir = cwd ?? process.cwd();
   return fileExists(join(dir, 'pnpm-lock.yaml'));
 }
+
+/**
+ * Check if the project has been migrated to pnpm.
+ * A project is considered migrated if pnpm-lock.yaml exists.
+ */
+export async function isMigrated(cwd?: string): Promise<boolean> {
+  return hasPnpmLock(cwd);
+}

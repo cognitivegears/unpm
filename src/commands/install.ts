@@ -22,6 +22,12 @@ import {
   removeStrictFlag,
 } from '../security/strict-mode.js';
 import { validateLockfile } from '../security/lockfile.js';
+import {
+  detectMigrationMode,
+  preSyncLockfile,
+  postSyncLockfile,
+  cleanupTempLockfile,
+} from '../security/lockfile-sync.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -145,6 +151,7 @@ async function getEffectiveReleaseAgeConfig(
  * - Enforces minimum release age for packages (default: 2 days, 7 days in strict mode)
  * - Runs local package scripts (preinstall, postinstall, etc.) after installation
  * - Runs scripts for packages in the allowlist
+ * - In pre-migration mode, syncs lockfiles for npm interoperability
  */
 export async function install(
   args: string[],
@@ -152,9 +159,23 @@ export async function install(
 ): Promise<number> {
   const allArgs = [...globalArgs, ...args];
 
+  // Detect migration mode for lockfile sync
+  const mode = await detectMigrationMode();
+
+  // Pre-migration: sync package-lock.json to pnpm-lock.yaml
+  if (mode.mode === 'pre-migration') {
+    const preSyncSuccess = await preSyncLockfile(allArgs);
+    if (!preSyncSuccess) {
+      return 1; // Strict mode sync failure
+    }
+  }
+
   // Validate lockfile status (warn in normal mode, error in strict mode)
   const lockfileValid = await validateLockfile(allArgs);
   if (!lockfileValid) {
+    if (mode.mode === 'pre-migration') {
+      await cleanupTempLockfile();
+    }
     return 1;
   }
 
@@ -167,6 +188,9 @@ export async function install(
   // Handle script flags
   const scriptResult = await handleScriptFlags(flags, allArgs);
   if (!scriptResult.allowed) {
+    if (mode.mode === 'pre-migration') {
+      await cleanupTempLockfile();
+    }
     return 1;
   }
 
@@ -190,6 +214,9 @@ export async function install(
       await runLocalScripts('preinstall');
     } catch (error) {
       logger.error(`Preinstall script failed: ${error}`);
+      if (mode.mode === 'pre-migration') {
+        await cleanupTempLockfile();
+      }
       return 1;
     }
   }
@@ -204,6 +231,9 @@ export async function install(
   const result = await spawnPnpm(pnpmArgs);
 
   if (result.exitCode !== 0) {
+    if (mode.mode === 'pre-migration') {
+      await cleanupTempLockfile();
+    }
     return result.exitCode ?? 1;
   }
 
@@ -217,8 +247,17 @@ export async function install(
       await runLocalScripts('postinstall');
     } catch (error) {
       logger.error(`Postinstall script failed: ${error}`);
+      if (mode.mode === 'pre-migration') {
+        await cleanupTempLockfile();
+      }
       return 1;
     }
+  }
+
+  // Pre-migration: sync pnpm-lock.yaml back to package-lock.json, then cleanup
+  if (mode.mode === 'pre-migration') {
+    await postSyncLockfile(allArgs);
+    await cleanupTempLockfile();
   }
 
   return 0;
@@ -227,6 +266,7 @@ export async function install(
 /**
  * CI install - frozen lockfile with security protections.
  * In strict mode, always uses --frozen-lockfile.
+ * In pre-migration mode, syncs lockfiles (no post-sync since CI doesn't modify lockfile).
  */
 export async function ci(
   args: string[],
@@ -234,9 +274,23 @@ export async function ci(
 ): Promise<number> {
   const allArgs = [...globalArgs, ...args];
 
+  // Detect migration mode for lockfile sync
+  const mode = await detectMigrationMode();
+
+  // Pre-migration: sync package-lock.json to pnpm-lock.yaml
+  if (mode.mode === 'pre-migration') {
+    const preSyncSuccess = await preSyncLockfile(allArgs);
+    if (!preSyncSuccess) {
+      return 1; // Strict mode sync failure
+    }
+  }
+
   // Validate lockfile status (warn in normal mode, error in strict mode)
   const lockfileValid = await validateLockfile(allArgs);
   if (!lockfileValid) {
+    if (mode.mode === 'pre-migration') {
+      await cleanupTempLockfile();
+    }
     return 1;
   }
 
@@ -248,6 +302,9 @@ export async function ci(
   const { flags } = extractPackagesFromArgs(cleanedArgs);
   const scriptResult = await handleScriptFlags(flags, allArgs);
   if (!scriptResult.allowed) {
+    if (mode.mode === 'pre-migration') {
+      await cleanupTempLockfile();
+    }
     return 1;
   }
 
@@ -270,6 +327,9 @@ export async function ci(
       await runLocalScripts('preinstall');
     } catch (error) {
       logger.error(`Preinstall script failed: ${error}`);
+      if (mode.mode === 'pre-migration') {
+        await cleanupTempLockfile();
+      }
       return 1;
     }
   }
@@ -283,6 +343,9 @@ export async function ci(
   const result = await spawnPnpm(pnpmArgs);
 
   if (result.exitCode !== 0) {
+    if (mode.mode === 'pre-migration') {
+      await cleanupTempLockfile();
+    }
     return result.exitCode ?? 1;
   }
 
@@ -293,8 +356,16 @@ export async function ci(
       await runLocalScripts('postinstall');
     } catch (error) {
       logger.error(`Postinstall script failed: ${error}`);
+      if (mode.mode === 'pre-migration') {
+        await cleanupTempLockfile();
+      }
       return 1;
     }
+  }
+
+  // Pre-migration: cleanup (no post-sync for CI since it doesn't modify lockfile)
+  if (mode.mode === 'pre-migration') {
+    await cleanupTempLockfile();
   }
 
   return 0;
@@ -302,6 +373,7 @@ export async function ci(
 
 /**
  * Add packages with security protections.
+ * In pre-migration mode, syncs lockfiles for npm interoperability.
  */
 export async function add(
   args: string[],
@@ -309,9 +381,23 @@ export async function add(
 ): Promise<number> {
   const allArgs = [...globalArgs, ...args];
 
+  // Detect migration mode for lockfile sync
+  const mode = await detectMigrationMode();
+
+  // Pre-migration: sync package-lock.json to pnpm-lock.yaml
+  if (mode.mode === 'pre-migration') {
+    const preSyncSuccess = await preSyncLockfile(allArgs);
+    if (!preSyncSuccess) {
+      return 1; // Strict mode sync failure
+    }
+  }
+
   // Validate lockfile status (warn in normal mode, error in strict mode)
   const lockfileValid = await validateLockfile(allArgs);
   if (!lockfileValid) {
+    if (mode.mode === 'pre-migration') {
+      await cleanupTempLockfile();
+    }
     return 1;
   }
 
@@ -324,6 +410,9 @@ export async function add(
   // Handle script flags
   const scriptResult = await handleScriptFlags(flags, allArgs);
   if (!scriptResult.allowed) {
+    if (mode.mode === 'pre-migration') {
+      await cleanupTempLockfile();
+    }
     return 1;
   }
 
@@ -344,6 +433,9 @@ export async function add(
   const result = await spawnPnpm(pnpmArgs);
 
   if (result.exitCode !== 0) {
+    if (mode.mode === 'pre-migration') {
+      await cleanupTempLockfile();
+    }
     return result.exitCode ?? 1;
   }
 
@@ -353,8 +445,17 @@ export async function add(
       await runAllowedPackageScripts();
     } catch (error) {
       logger.error(`Package script failed: ${error}`);
+      if (mode.mode === 'pre-migration') {
+        await cleanupTempLockfile();
+      }
       return 1;
     }
+  }
+
+  // Pre-migration: sync pnpm-lock.yaml back to package-lock.json, then cleanup
+  if (mode.mode === 'pre-migration') {
+    await postSyncLockfile(allArgs);
+    await cleanupTempLockfile();
   }
 
   return 0;
@@ -362,16 +463,48 @@ export async function add(
 
 /**
  * Remove packages.
+ * In pre-migration mode, syncs lockfiles for npm interoperability.
  */
-export async function remove(args: string[]): Promise<number> {
+export async function remove(
+  args: string[],
+  globalArgs: string[] = []
+): Promise<number> {
+  const allArgs = [...globalArgs, ...args];
+
+  // Detect migration mode for lockfile sync
+  const mode = await detectMigrationMode();
+
+  // Pre-migration: sync package-lock.json to pnpm-lock.yaml
+  if (mode.mode === 'pre-migration') {
+    const preSyncSuccess = await preSyncLockfile(allArgs);
+    if (!preSyncSuccess) {
+      return 1; // Strict mode sync failure
+    }
+  }
+
   const mappedArgs = mapNpmFlagsToPnpm(removeUnpmFlags(args));
   const pnpmArgs = ['remove', ...removeStrictFlag(mappedArgs)];
   const result = await spawnPnpm(pnpmArgs);
-  return result.exitCode ?? 0;
+
+  if (result.exitCode !== 0) {
+    if (mode.mode === 'pre-migration') {
+      await cleanupTempLockfile();
+    }
+    return result.exitCode ?? 1;
+  }
+
+  // Pre-migration: sync pnpm-lock.yaml back to package-lock.json, then cleanup
+  if (mode.mode === 'pre-migration') {
+    await postSyncLockfile(allArgs);
+    await cleanupTempLockfile();
+  }
+
+  return 0;
 }
 
 /**
  * Update packages with security protections.
+ * In pre-migration mode, syncs lockfiles for npm interoperability.
  */
 export async function update(
   args: string[],
@@ -379,9 +512,23 @@ export async function update(
 ): Promise<number> {
   const allArgs = [...globalArgs, ...args];
 
+  // Detect migration mode for lockfile sync
+  const mode = await detectMigrationMode();
+
+  // Pre-migration: sync package-lock.json to pnpm-lock.yaml
+  if (mode.mode === 'pre-migration') {
+    const preSyncSuccess = await preSyncLockfile(allArgs);
+    if (!preSyncSuccess) {
+      return 1; // Strict mode sync failure
+    }
+  }
+
   // Validate lockfile status (warn in normal mode, error in strict mode)
   const lockfileValid = await validateLockfile(allArgs);
   if (!lockfileValid) {
+    if (mode.mode === 'pre-migration') {
+      await cleanupTempLockfile();
+    }
     return 1;
   }
 
@@ -393,6 +540,9 @@ export async function update(
   const { flags } = extractPackagesFromArgs(cleanedArgs);
   const scriptResult = await handleScriptFlags(flags, allArgs);
   if (!scriptResult.allowed) {
+    if (mode.mode === 'pre-migration') {
+      await cleanupTempLockfile();
+    }
     return 1;
   }
 
@@ -412,6 +562,9 @@ export async function update(
   const result = await spawnPnpm(pnpmArgs);
 
   if (result.exitCode !== 0) {
+    if (mode.mode === 'pre-migration') {
+      await cleanupTempLockfile();
+    }
     return result.exitCode ?? 1;
   }
 
@@ -421,8 +574,17 @@ export async function update(
       await runAllowedPackageScripts();
     } catch (error) {
       logger.error(`Package script failed: ${error}`);
+      if (mode.mode === 'pre-migration') {
+        await cleanupTempLockfile();
+      }
       return 1;
     }
+  }
+
+  // Pre-migration: sync pnpm-lock.yaml back to package-lock.json, then cleanup
+  if (mode.mode === 'pre-migration') {
+    await postSyncLockfile(allArgs);
+    await cleanupTempLockfile();
   }
 
   return 0;

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import chalk from 'chalk';
-import { fileExists, hasPnpmLock } from '../utils/config.js';
+import { fileExists, hasPnpmLock, hasPackageLock } from '../utils/config.js';
 import { isStrictMode } from './strict-mode.js';
 import { logger } from '../utils/logger.js';
 
@@ -71,9 +71,15 @@ export async function isInGitignore(
 /**
  * Check lockfile status and report warnings/errors.
  *
+ * In pre-migration mode (no pnpm-lock.yaml):
+ * - Validates package-lock.json instead
+ *
+ * In post-migration mode (pnpm-lock.yaml exists):
+ * - Validates pnpm-lock.yaml (original behavior)
+ *
  * Checks:
- * 1. Is pnpm-lock.yaml missing?
- * 2. Is lockfile in .gitignore (if in a git repo)?
+ * 1. Is the appropriate lockfile missing?
+ * 2. Is the lockfile in .gitignore (if in a git repo)?
  *
  * In strict mode, these are errors (blocks the command).
  * In normal mode, these are warnings.
@@ -83,40 +89,46 @@ export async function checkLockfile(
   cwd?: string
 ): Promise<LockfileCheckResult> {
   const strict = await isStrictMode(args, cwd);
-  const hasLockfile = await hasPnpmLock(cwd);
+  const hasPnpm = await hasPnpmLock(cwd);
+  const hasNpmLock = await hasPackageLock(cwd);
   const inGitRepo = await isGitRepo(cwd);
 
   const messages: string[] = [];
   let isGitignored: boolean | undefined;
 
+  // Determine which mode we're in
+  const isPreMigration = !hasPnpm;
+  const lockfileName = isPreMigration ? 'package-lock.json' : 'pnpm-lock.yaml';
+  const hasLockfile = isPreMigration ? hasNpmLock : hasPnpm;
+
   // Check if lockfile exists
   if (!hasLockfile) {
     if (strict) {
       messages.push(
-        'No pnpm-lock.yaml found. Lockfile is required in strict mode.'
+        `No ${lockfileName} found. Lockfile is required in strict mode.`
       );
       messages.push('Run "unpm install" to generate a lockfile.');
     } else {
       messages.push(
-        'No pnpm-lock.yaml found. Consider committing a lockfile for reproducible builds.'
+        `No ${lockfileName} found. Consider committing a lockfile for reproducible builds.`
       );
     }
   }
 
   // Check if lockfile is gitignored (only if we're in a git repo and have a lockfile)
   if (inGitRepo && hasLockfile) {
-    isGitignored = await isInGitignore('pnpm-lock.yaml', cwd);
+    isGitignored = await isInGitignore(lockfileName, cwd);
     if (isGitignored) {
       if (strict) {
         messages.push(
-          'pnpm-lock.yaml is in .gitignore. Lockfile must be committed in strict mode.'
+          `${lockfileName} is in .gitignore. Lockfile must be committed in strict mode.`
         );
         messages.push(
-          'Remove pnpm-lock.yaml from .gitignore to enable reproducible builds.'
+          `Remove ${lockfileName} from .gitignore to enable reproducible builds.`
         );
       } else {
         messages.push(
-          'pnpm-lock.yaml is in .gitignore. Consider committing the lockfile for reproducible builds.'
+          `${lockfileName} is in .gitignore. Consider committing the lockfile for reproducible builds.`
         );
       }
     }

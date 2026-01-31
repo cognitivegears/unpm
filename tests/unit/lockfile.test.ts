@@ -12,6 +12,7 @@ import * as fsPromises from 'node:fs/promises';
 vi.mock('../../src/utils/config.js', () => ({
   fileExists: vi.fn(),
   hasPnpmLock: vi.fn(),
+  hasPackageLock: vi.fn(),
 }));
 
 vi.mock('../../src/security/strict-mode.js', () => ({
@@ -101,86 +102,145 @@ describe('checkLockfile', () => {
     vi.resetAllMocks();
   });
 
-  it('should return no messages when lockfile exists and is not gitignored', async () => {
-    vi.mocked(strictModeModule.isStrictMode).mockResolvedValue(false);
-    vi.mocked(configModule.hasPnpmLock).mockResolvedValue(true);
-    vi.mocked(configModule.fileExists).mockResolvedValue(true);
-    vi.mocked(fsPromises.readFile).mockResolvedValue('node_modules\n');
+  describe('post-migration mode (pnpm-lock.yaml exists)', () => {
+    it('should return no messages when lockfile exists and is not gitignored', async () => {
+      vi.mocked(strictModeModule.isStrictMode).mockResolvedValue(false);
+      vi.mocked(configModule.hasPnpmLock).mockResolvedValue(true);
+      vi.mocked(configModule.hasPackageLock).mockResolvedValue(false);
+      vi.mocked(configModule.fileExists).mockResolvedValue(true);
+      vi.mocked(fsPromises.readFile).mockResolvedValue('node_modules\n');
 
-    const result = await checkLockfile([], '/test/path');
+      const result = await checkLockfile([], '/test/path');
 
-    expect(result.allowed).toBe(true);
-    expect(result.hasLockfile).toBe(true);
-    expect(result.isGitignored).toBe(false);
-    expect(result.messages).toHaveLength(0);
+      expect(result.allowed).toBe(true);
+      expect(result.hasLockfile).toBe(true);
+      expect(result.isGitignored).toBe(false);
+      expect(result.messages).toHaveLength(0);
+    });
+
+    it('should warn when pnpm-lock.yaml is gitignored in normal mode', async () => {
+      vi.mocked(strictModeModule.isStrictMode).mockResolvedValue(false);
+      vi.mocked(configModule.hasPnpmLock).mockResolvedValue(true);
+      vi.mocked(configModule.hasPackageLock).mockResolvedValue(false);
+      vi.mocked(configModule.fileExists).mockResolvedValue(true);
+      vi.mocked(fsPromises.readFile).mockResolvedValue('pnpm-lock.yaml\n');
+
+      const result = await checkLockfile([], '/test/path');
+
+      expect(result.allowed).toBe(true);
+      expect(result.hasLockfile).toBe(true);
+      expect(result.isGitignored).toBe(true);
+      expect(result.messages.length).toBeGreaterThan(0);
+      expect(result.messages[0]).toContain('pnpm-lock.yaml');
+      expect(result.messages[0]).toContain('in .gitignore');
+    });
+
+    it('should error when pnpm-lock.yaml is gitignored in strict mode', async () => {
+      vi.mocked(strictModeModule.isStrictMode).mockResolvedValue(true);
+      vi.mocked(configModule.hasPnpmLock).mockResolvedValue(true);
+      vi.mocked(configModule.hasPackageLock).mockResolvedValue(false);
+      vi.mocked(configModule.fileExists).mockResolvedValue(true);
+      vi.mocked(fsPromises.readFile).mockResolvedValue('pnpm-lock.yaml\n');
+
+      const result = await checkLockfile(['--strict'], '/test/path');
+
+      expect(result.allowed).toBe(false);
+      expect(result.hasLockfile).toBe(true);
+      expect(result.isGitignored).toBe(true);
+      expect(result.messages.length).toBeGreaterThan(0);
+      expect(result.messages[0]).toContain('must be committed in strict mode');
+    });
+
+    it('should not check gitignore when not in a git repo', async () => {
+      vi.mocked(strictModeModule.isStrictMode).mockResolvedValue(false);
+      vi.mocked(configModule.hasPnpmLock).mockResolvedValue(true);
+      vi.mocked(configModule.hasPackageLock).mockResolvedValue(false);
+      vi.mocked(configModule.fileExists).mockResolvedValue(false); // No .git directory
+
+      const result = await checkLockfile([], '/test/path');
+
+      expect(result.allowed).toBe(true);
+      expect(result.hasLockfile).toBe(true);
+      expect(result.isGitignored).toBeUndefined();
+      expect(result.messages).toHaveLength(0);
+    });
   });
 
-  it('should warn when lockfile is missing in normal mode', async () => {
-    vi.mocked(strictModeModule.isStrictMode).mockResolvedValue(false);
-    vi.mocked(configModule.hasPnpmLock).mockResolvedValue(false);
-    vi.mocked(configModule.fileExists).mockResolvedValue(false);
+  describe('pre-migration mode (no pnpm-lock.yaml)', () => {
+    it('should validate package-lock.json when pnpm-lock.yaml does not exist', async () => {
+      vi.mocked(strictModeModule.isStrictMode).mockResolvedValue(false);
+      vi.mocked(configModule.hasPnpmLock).mockResolvedValue(false);
+      vi.mocked(configModule.hasPackageLock).mockResolvedValue(true);
+      vi.mocked(configModule.fileExists).mockResolvedValue(true);
+      vi.mocked(fsPromises.readFile).mockResolvedValue('node_modules\n');
 
-    const result = await checkLockfile([], '/test/path');
+      const result = await checkLockfile([], '/test/path');
 
-    expect(result.allowed).toBe(true);
-    expect(result.hasLockfile).toBe(false);
-    expect(result.messages.length).toBeGreaterThan(0);
-    expect(result.messages[0]).toContain('No pnpm-lock.yaml found');
-  });
+      expect(result.allowed).toBe(true);
+      expect(result.hasLockfile).toBe(true);
+      expect(result.isGitignored).toBe(false);
+      expect(result.messages).toHaveLength(0);
+    });
 
-  it('should error when lockfile is missing in strict mode', async () => {
-    vi.mocked(strictModeModule.isStrictMode).mockResolvedValue(true);
-    vi.mocked(configModule.hasPnpmLock).mockResolvedValue(false);
-    vi.mocked(configModule.fileExists).mockResolvedValue(false);
+    it('should warn when no lockfile exists in normal mode', async () => {
+      vi.mocked(strictModeModule.isStrictMode).mockResolvedValue(false);
+      vi.mocked(configModule.hasPnpmLock).mockResolvedValue(false);
+      vi.mocked(configModule.hasPackageLock).mockResolvedValue(false);
+      vi.mocked(configModule.fileExists).mockResolvedValue(false);
 
-    const result = await checkLockfile(['--strict'], '/test/path');
+      const result = await checkLockfile([], '/test/path');
 
-    expect(result.allowed).toBe(false);
-    expect(result.hasLockfile).toBe(false);
-    expect(result.messages.length).toBeGreaterThan(0);
-    expect(result.messages[0]).toContain('required in strict mode');
-  });
+      expect(result.allowed).toBe(true);
+      expect(result.hasLockfile).toBe(false);
+      expect(result.messages.length).toBeGreaterThan(0);
+      expect(result.messages[0]).toContain('No package-lock.json found');
+    });
 
-  it('should warn when lockfile is gitignored in normal mode', async () => {
-    vi.mocked(strictModeModule.isStrictMode).mockResolvedValue(false);
-    vi.mocked(configModule.hasPnpmLock).mockResolvedValue(true);
-    vi.mocked(configModule.fileExists).mockResolvedValue(true);
-    vi.mocked(fsPromises.readFile).mockResolvedValue('pnpm-lock.yaml\n');
+    it('should error when no lockfile exists in strict mode', async () => {
+      vi.mocked(strictModeModule.isStrictMode).mockResolvedValue(true);
+      vi.mocked(configModule.hasPnpmLock).mockResolvedValue(false);
+      vi.mocked(configModule.hasPackageLock).mockResolvedValue(false);
+      vi.mocked(configModule.fileExists).mockResolvedValue(false);
 
-    const result = await checkLockfile([], '/test/path');
+      const result = await checkLockfile(['--strict'], '/test/path');
 
-    expect(result.allowed).toBe(true);
-    expect(result.hasLockfile).toBe(true);
-    expect(result.isGitignored).toBe(true);
-    expect(result.messages.length).toBeGreaterThan(0);
-    expect(result.messages[0]).toContain('in .gitignore');
-  });
+      expect(result.allowed).toBe(false);
+      expect(result.hasLockfile).toBe(false);
+      expect(result.messages.length).toBeGreaterThan(0);
+      expect(result.messages[0]).toContain('required in strict mode');
+    });
 
-  it('should error when lockfile is gitignored in strict mode', async () => {
-    vi.mocked(strictModeModule.isStrictMode).mockResolvedValue(true);
-    vi.mocked(configModule.hasPnpmLock).mockResolvedValue(true);
-    vi.mocked(configModule.fileExists).mockResolvedValue(true);
-    vi.mocked(fsPromises.readFile).mockResolvedValue('pnpm-lock.yaml\n');
+    it('should warn when package-lock.json is gitignored in normal mode', async () => {
+      vi.mocked(strictModeModule.isStrictMode).mockResolvedValue(false);
+      vi.mocked(configModule.hasPnpmLock).mockResolvedValue(false);
+      vi.mocked(configModule.hasPackageLock).mockResolvedValue(true);
+      vi.mocked(configModule.fileExists).mockResolvedValue(true);
+      vi.mocked(fsPromises.readFile).mockResolvedValue('package-lock.json\n');
 
-    const result = await checkLockfile(['--strict'], '/test/path');
+      const result = await checkLockfile([], '/test/path');
 
-    expect(result.allowed).toBe(false);
-    expect(result.hasLockfile).toBe(true);
-    expect(result.isGitignored).toBe(true);
-    expect(result.messages.length).toBeGreaterThan(0);
-    expect(result.messages[0]).toContain('must be committed in strict mode');
-  });
+      expect(result.allowed).toBe(true);
+      expect(result.hasLockfile).toBe(true);
+      expect(result.isGitignored).toBe(true);
+      expect(result.messages.length).toBeGreaterThan(0);
+      expect(result.messages[0]).toContain('package-lock.json');
+      expect(result.messages[0]).toContain('in .gitignore');
+    });
 
-  it('should not check gitignore when not in a git repo', async () => {
-    vi.mocked(strictModeModule.isStrictMode).mockResolvedValue(false);
-    vi.mocked(configModule.hasPnpmLock).mockResolvedValue(true);
-    vi.mocked(configModule.fileExists).mockResolvedValue(false); // No .git directory
+    it('should error when package-lock.json is gitignored in strict mode', async () => {
+      vi.mocked(strictModeModule.isStrictMode).mockResolvedValue(true);
+      vi.mocked(configModule.hasPnpmLock).mockResolvedValue(false);
+      vi.mocked(configModule.hasPackageLock).mockResolvedValue(true);
+      vi.mocked(configModule.fileExists).mockResolvedValue(true);
+      vi.mocked(fsPromises.readFile).mockResolvedValue('package-lock.json\n');
 
-    const result = await checkLockfile([], '/test/path');
+      const result = await checkLockfile(['--strict'], '/test/path');
 
-    expect(result.allowed).toBe(true);
-    expect(result.hasLockfile).toBe(true);
-    expect(result.isGitignored).toBeUndefined();
-    expect(result.messages).toHaveLength(0);
+      expect(result.allowed).toBe(false);
+      expect(result.hasLockfile).toBe(true);
+      expect(result.isGitignored).toBe(true);
+      expect(result.messages.length).toBeGreaterThan(0);
+      expect(result.messages[0]).toContain('must be committed in strict mode');
+    });
   });
 });

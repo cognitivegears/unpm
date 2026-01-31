@@ -9,6 +9,7 @@ npm's default behavior allows packages to execute arbitrary scripts during insta
 - **Scripts blocked by default** - Dependency install scripts are blocked unless explicitly allowed
 - **Minimum release age** - New packages must be at least 2 days old before installation
 - **Strict mode for CI** - Enhanced protections for automated environments
+- **Gradual migration** - Use npm and unpm interchangeably before committing to full migration
 - **Zero migration required** - Same commands, same flags, drop-in replacement
 
 ## Quick Start
@@ -65,6 +66,25 @@ unpm --strict ci
 ```
 
 Strict mode enforces 7-day release age, blocks `dlx`, and requires frozen lockfiles.
+
+### Gradual Migration
+
+UNPM supports gradual migration from npm. Before running `unpm migrate`, npm and unpm work interchangeably:
+
+```bash
+# These can be used interchangeably before migration
+npm install lodash
+unpm install express    # Syncs with package-lock.json automatically
+npm install axios       # Works seamlessly
+```
+
+When ready to fully commit to pnpm's security benefits:
+
+```bash
+unpm migrate
+```
+
+After migration, npm install/update is blocked to ensure consistent, secure dependency management.
 
 ## Documentation
 

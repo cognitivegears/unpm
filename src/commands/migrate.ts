@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { execPnpm } from '../utils/exec.js';
+import { execPnpm, getPnpmVersion } from '../utils/exec.js';
 import {
   hasPackageLock,
   hasPnpmLock,
@@ -9,7 +9,7 @@ import {
 } from '../utils/config.js';
 import { initializeLavamoatConfig } from '../security/lavamoat.js';
 import { logger } from '../utils/logger.js';
-import { readFile, appendFile } from 'node:fs/promises';
+import { readFile, appendFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export async function migrate(args: string[]): Promise<number> {
@@ -135,14 +135,112 @@ export async function migrate(args: string[]): Promise<number> {
   }
   logger.info('');
 
+  // Step 6: Delete package-lock.json (pnpm-lock.yaml persists as migration marker)
+  if (hasNpmLock) {
+    logger.info('Removing package-lock.json...');
+    if (!dryRun) {
+      try {
+        await unlink(join(cwd, 'package-lock.json'));
+        logger.success('Removed package-lock.json');
+      } catch (error) {
+        logger.warn(
+          `Could not remove package-lock.json: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      }
+    } else {
+      logger.info('  [dry-run] Would remove package-lock.json');
+    }
+    logger.info('');
+  }
+
+  // Step 7: Set packageManager field for corepack
+  const pnpmVersion = await getPnpmVersion();
+  if (pnpmVersion) {
+    logger.info('Setting packageManager field for corepack...');
+    if (!dryRun) {
+      // Re-read package.json in case it was modified
+      const updatedPackageJson = await readPackageJson(cwd);
+      if (updatedPackageJson) {
+        updatedPackageJson['packageManager'] = `pnpm@${pnpmVersion}`;
+        await writePackageJson(updatedPackageJson, cwd);
+        logger.success(`Set packageManager to pnpm@${pnpmVersion}`);
+      }
+    } else {
+      logger.info(
+        `  [dry-run] Would set packageManager to pnpm@${pnpmVersion}`
+      );
+    }
+    logger.info('');
+  }
+
+  // Step 8: Add preinstall script to block npm
+  logger.info('Adding preinstall script to block npm...');
+  if (!dryRun) {
+    const updatedPackageJson = await readPackageJson(cwd);
+    if (updatedPackageJson) {
+      if (!updatedPackageJson.scripts) {
+        updatedPackageJson.scripts = {};
+      }
+      // Only add if there's no existing preinstall script
+      if (!updatedPackageJson.scripts['preinstall']) {
+        updatedPackageJson.scripts['preinstall'] =
+          "node -e \"if(!process.env.npm_execpath?.includes('pnpm')){console.error('Use unpm or pnpm instead of npm');process.exit(1)}\"";
+        await writePackageJson(updatedPackageJson, cwd);
+        logger.success('Added preinstall script to block npm');
+      } else {
+        logger.info('Preinstall script already exists, skipping');
+      }
+    }
+  } else {
+    logger.info('  [dry-run] Would add preinstall script to block npm');
+  }
+  logger.info('');
+
+  // Step 9: Create .pnpmrc with secure defaults
+  const pnpmrcPath = join(cwd, '.pnpmrc');
+  const hasPnpmrc = await fileExists(pnpmrcPath);
+  if (!hasPnpmrc) {
+    logger.info('Creating .pnpmrc with secure defaults...');
+    if (!dryRun) {
+      const pnpmrcContent = `# UNPM security defaults
+ignore-scripts=true
+minimum-release-age=2d
+`;
+      await writeFile(pnpmrcPath, pnpmrcContent, 'utf-8');
+      logger.success('Created .pnpmrc with secure defaults');
+    } else {
+      logger.info('  [dry-run] Would create .pnpmrc with secure defaults');
+    }
+    logger.info('');
+  }
+
   // Summary
   logger.info(chalk.bold('Migration complete!'));
+  logger.info('');
+  logger.info('What changed:');
+  logger.info('  - pnpm-lock.yaml created (replaces package-lock.json)');
+  if (hasNpmLock) {
+    logger.info('  - package-lock.json removed');
+  }
+  if (pnpmVersion) {
+    logger.info(`  - packageManager field set to pnpm@${pnpmVersion}`);
+  }
+  logger.info('  - preinstall script added to block npm');
+  if (!hasPnpmrc) {
+    logger.info('  - .pnpmrc created with secure defaults');
+  }
   logger.info('');
   logger.info('Next steps:');
   logger.info('  1. Review the changes and commit them');
   logger.info('  2. If you have packages that need to run install scripts:');
   logger.info('     unpm allow-scripts add <package-name>');
   logger.info('  3. Update your CI/CD to use: unpm ci');
+  logger.info('');
+  logger.info(
+    chalk.dim(
+      'Note: npm install/update will now be blocked. Use unpm or pnpm instead.'
+    )
+  );
   logger.info('');
 
   return 0;

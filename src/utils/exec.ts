@@ -102,3 +102,22 @@ export function spawnNpm(
     stdio: 'inherit',
   });
 }
+
+/**
+ * Get the installed pnpm version string.
+ * Returns the version (e.g., "9.15.0") or null if pnpm is not found.
+ */
+export async function getPnpmVersion(): Promise<string | null> {
+  try {
+    const result = await execa('pnpm', ['--version'], {
+      reject: false,
+      stdio: 'pipe',
+    });
+    if (result.exitCode === 0 && typeof result.stdout === 'string') {
+      return result.stdout.trim();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
