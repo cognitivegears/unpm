@@ -107,9 +107,9 @@ export async function migrate(args: string[]): Promise<number> {
     packageJson['unpm'] = {
       ...existingUnpm,
       migrated: true,
-      allowLocalScripts: existingUnpm?.allowLocalScripts ?? true,
-      allowDependencyScripts: existingUnpm?.allowDependencyScripts ?? false,
-      lavamoatEnabled: existingUnpm?.lavamoatEnabled ?? true,
+      allowLocalScripts: existingUnpm?.['allowLocalScripts'] ?? true,
+      allowDependencyScripts: existingUnpm?.['allowDependencyScripts'] ?? false,
+      lavamoatEnabled: existingUnpm?.['lavamoatEnabled'] ?? true,
     };
     await writePackageJson(packageJson, cwd);
     logger.success('Added unpm configuration (migrated: true)');

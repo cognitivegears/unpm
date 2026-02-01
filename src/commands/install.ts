@@ -487,11 +487,8 @@ export async function remove(
   }
 
   const mappedArgs = mapNpmFlagsToPnpm(removeUnpmFlags(args));
-  const pnpmArgs = [
-    'remove',
-    ...removeStrictFlag(mappedArgs),
-    ...getCompatibilityFlags(mode),
-  ];
+  // Note: pnpm remove doesn't support --shamefully-hoist, so we don't pass compatibility flags
+  const pnpmArgs = ['remove', ...removeStrictFlag(mappedArgs)];
   const result = await spawnPnpm(pnpmArgs);
 
   if (result.exitCode !== 0) {
