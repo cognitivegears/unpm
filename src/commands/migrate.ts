@@ -103,7 +103,9 @@ export async function migrate(args: string[]): Promise<number> {
   // Step 4: Add unpm config to package.json (including migrated flag)
   logger.info('Adding unpm configuration to package.json...');
   if (!dryRun) {
-    const existingUnpm = packageJson['unpm'] as Record<string, unknown> | undefined;
+    const existingUnpm = packageJson['unpm'] as
+      | Record<string, unknown>
+      | undefined;
     packageJson['unpm'] = {
       ...existingUnpm,
       migrated: true,
@@ -189,7 +191,9 @@ export async function migrate(args: string[]): Promise<number> {
       if (!engines['npm']) {
         engines['npm'] = 'use-pnpm-instead';
         modified = true;
-        logger.success('Added engines.npm constraint (blocks npm update, outdated, etc.)');
+        logger.success(
+          'Added engines.npm constraint (blocks npm update, outdated, etc.)'
+        );
       }
 
       // Add preinstall script to block npm install/ci
@@ -210,7 +214,9 @@ export async function migrate(args: string[]): Promise<number> {
       }
     }
   } else {
-    logger.info('  [dry-run] Would add engines constraint and preinstall script');
+    logger.info(
+      '  [dry-run] Would add engines constraint and preinstall script'
+    );
   }
   logger.info('');
 
@@ -259,7 +265,9 @@ engine-strict=true
         JSON.stringify(shrinkwrapContent, null, 2) + '\n',
         'utf-8'
       );
-      logger.success('Created npm-shrinkwrap.json (blocks npm before node_modules parsing)');
+      logger.success(
+        'Created npm-shrinkwrap.json (blocks npm before node_modules parsing)'
+      );
     } else {
       logger.info('  [dry-run] Would create npm-shrinkwrap.json');
     }

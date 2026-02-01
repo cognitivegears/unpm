@@ -713,8 +713,11 @@ describe.skipIf(!HEAVY_TESTS)(
       // 2. preinstall script - backup mechanism
       expect(npmResult.exitCode).not.toBe(0);
       const output = npmResult.stderr + npmResult.stdout;
-      const blockedByEngine = output.includes('EBADENGINE') || output.includes('use-pnpm-instead');
-      const blockedByPreinstall = output.includes('Use unpm or pnpm instead of npm');
+      const blockedByEngine =
+        output.includes('EBADENGINE') || output.includes('use-pnpm-instead');
+      const blockedByPreinstall = output.includes(
+        'Use unpm or pnpm instead of npm'
+      );
       expect(blockedByEngine || blockedByPreinstall).toBe(true);
     }, 150000);
 
@@ -1223,126 +1226,119 @@ describe.skipIf(!HEAVY_TESTS)(
   }
 );
 
-describe.skipIf(!HEAVY_TESTS)(
-  'Heavy Integration Tests - Audit Command',
-  () => {
-    let tempDir: string;
+describe.skipIf(!HEAVY_TESTS)('Heavy Integration Tests - Audit Command', () => {
+  let tempDir: string;
 
-    beforeAll(async () => {
-      tempDir = await mkdtemp(join(tmpdir(), 'unpm-audit-'));
+  beforeAll(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'unpm-audit-'));
+  });
+
+  afterAll(async () => {
+    if (tempDir) {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should run audit on a project', async () => {
+    const projectDir = join(tempDir, 'audit-test');
+    await mkdir(projectDir, { recursive: true });
+
+    await writeFile(
+      join(projectDir, 'package.json'),
+      JSON.stringify({
+        name: 'audit-test',
+        version: '1.0.0',
+        dependencies: {
+          'is-odd': '^3.0.1',
+        },
+      })
+    );
+
+    // Install first
+    const installResult = await execa('node', [cliPath, 'install'], {
+      reject: false,
+      cwd: projectDir,
+      timeout: 120000,
     });
+    expect(installResult.exitCode).toBe(0);
 
-    afterAll(async () => {
-      if (tempDir) {
-        await rm(tempDir, { recursive: true, force: true });
-      }
+    // Run audit (may return non-zero if vulnerabilities found, but should not error)
+    const auditResult = await execa('node', [cliPath, 'audit'], {
+      reject: false,
+      cwd: projectDir,
+      timeout: 60000,
     });
+    // Audit returns 0 if no vulnerabilities, non-zero if vulnerabilities found
+    // Both are valid outcomes
+    expect(auditResult.exitCode).toBeLessThanOrEqual(1);
+  }, 180000);
 
-    it('should run audit on a project', async () => {
-      const projectDir = join(tempDir, 'audit-test');
-      await mkdir(projectDir, { recursive: true });
+  it('should run audit with --json flag', async () => {
+    const projectDir = join(tempDir, 'audit-json-test');
+    await mkdir(projectDir, { recursive: true });
 
-      await writeFile(
-        join(projectDir, 'package.json'),
-        JSON.stringify({
-          name: 'audit-test',
-          version: '1.0.0',
-          dependencies: {
-            'is-odd': '^3.0.1',
-          },
-        })
-      );
+    await writeFile(
+      join(projectDir, 'package.json'),
+      JSON.stringify({
+        name: 'audit-json-test',
+        version: '1.0.0',
+        dependencies: {
+          'is-odd': '^3.0.1',
+        },
+      })
+    );
 
-      // Install first
-      const installResult = await execa('node', [cliPath, 'install'], {
-        reject: false,
-        cwd: projectDir,
-        timeout: 120000,
-      });
-      expect(installResult.exitCode).toBe(0);
+    // Install first
+    const installResult = await execa('node', [cliPath, 'install'], {
+      reject: false,
+      cwd: projectDir,
+      timeout: 120000,
+    });
+    expect(installResult.exitCode).toBe(0);
 
-      // Run audit (may return non-zero if vulnerabilities found, but should not error)
-      const auditResult = await execa('node', [cliPath, 'audit'], {
-        reject: false,
-        cwd: projectDir,
-        timeout: 60000,
-      });
-      // Audit returns 0 if no vulnerabilities, non-zero if vulnerabilities found
-      // Both are valid outcomes
-      expect(auditResult.exitCode).toBeLessThanOrEqual(1);
-    }, 180000);
+    // Run audit with --json
+    const auditResult = await execa('node', [cliPath, 'audit', '--json'], {
+      reject: false,
+      cwd: projectDir,
+      timeout: 60000,
+    });
+    // Should return valid JSON output
+    expect(auditResult.exitCode).toBeLessThanOrEqual(1);
+  }, 180000);
 
-    it('should run audit with --json flag', async () => {
-      const projectDir = join(tempDir, 'audit-json-test');
-      await mkdir(projectDir, { recursive: true });
+  it('should enforce high audit level in strict mode', async () => {
+    const projectDir = join(tempDir, 'audit-strict-test');
+    await mkdir(projectDir, { recursive: true });
 
-      await writeFile(
-        join(projectDir, 'package.json'),
-        JSON.stringify({
-          name: 'audit-json-test',
-          version: '1.0.0',
-          dependencies: {
-            'is-odd': '^3.0.1',
-          },
-        })
-      );
+    await writeFile(
+      join(projectDir, 'package.json'),
+      JSON.stringify({
+        name: 'audit-strict-test',
+        version: '1.0.0',
+        dependencies: {
+          'is-odd': '^3.0.1',
+        },
+      })
+    );
 
-      // Install first
-      const installResult = await execa('node', [cliPath, 'install'], {
-        reject: false,
-        cwd: projectDir,
-        timeout: 120000,
-      });
-      expect(installResult.exitCode).toBe(0);
+    // Install first
+    const installResult = await execa('node', [cliPath, 'install'], {
+      reject: false,
+      cwd: projectDir,
+      timeout: 120000,
+    });
+    expect(installResult.exitCode).toBe(0);
 
-      // Run audit with --json
-      const auditResult = await execa('node', [cliPath, 'audit', '--json'], {
-        reject: false,
-        cwd: projectDir,
-        timeout: 60000,
-      });
-      // Should return valid JSON output
-      expect(auditResult.exitCode).toBeLessThanOrEqual(1);
-    }, 180000);
-
-    it('should enforce high audit level in strict mode', async () => {
-      const projectDir = join(tempDir, 'audit-strict-test');
-      await mkdir(projectDir, { recursive: true });
-
-      await writeFile(
-        join(projectDir, 'package.json'),
-        JSON.stringify({
-          name: 'audit-strict-test',
-          version: '1.0.0',
-          dependencies: {
-            'is-odd': '^3.0.1',
-          },
-        })
-      );
-
-      // Install first
-      const installResult = await execa('node', [cliPath, 'install'], {
-        reject: false,
-        cwd: projectDir,
-        timeout: 120000,
-      });
-      expect(installResult.exitCode).toBe(0);
-
-      // Run audit in strict mode - should use audit-level=high
-      const auditResult = await execa(
-        'node',
-        [cliPath, 'audit', '--strict'],
-        {
-          reject: false,
-          cwd: projectDir,
-          timeout: 60000,
-        }
-      );
-      // Audit should run successfully (exit code depends on vulnerabilities)
-      expect(auditResult.exitCode).toBeLessThanOrEqual(1);
-    }, 180000);
-  }
-);
+    // Run audit in strict mode - should use audit-level=high
+    const auditResult = await execa('node', [cliPath, 'audit', '--strict'], {
+      reject: false,
+      cwd: projectDir,
+      timeout: 60000,
+    });
+    // Audit should run successfully (exit code depends on vulnerabilities)
+    expect(auditResult.exitCode).toBeLessThanOrEqual(1);
+  }, 180000);
+});
 
 describe.skipIf(!HEAVY_TESTS)(
   'Heavy Integration Tests - Rebuild Command',
@@ -1395,9 +1391,7 @@ describe.skipIf(!HEAVY_TESTS)(
       });
       // Should fail because rebuild without args bypasses security
       expect(rebuildResult.exitCode).toBe(1);
-      expect(rebuildResult.stdout + rebuildResult.stderr).toContain(
-        'security'
-      );
+      expect(rebuildResult.stdout + rebuildResult.stderr).toContain('security');
     }, 180000);
 
     it('should rebuild allowed packages when specified by name', async () => {
@@ -1440,7 +1434,6 @@ describe.skipIf(!HEAVY_TESTS)(
       );
       expect(rebuildResult.exitCode).toBe(0);
     }, 180000);
-
   }
 );
 
