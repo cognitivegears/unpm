@@ -82,6 +82,54 @@ unpm install --no-min-release-age lodash
 - `d` or `days` - days (e.g., `2d`)
 - `w` or `weeks` - weeks (e.g., `1w`)
 
+## Trust Policy
+
+UNPM supports pnpm's trust policy feature to prevent version downgrades that could introduce malicious code:
+
+```bash
+# Default: trust policy is set to no-downgrade
+unpm install
+
+# Disable trust policy (not recommended)
+unpm install --no-trust-policy
+
+# Set custom ignore-after duration (packages unchanged longer are exempt)
+unpm install --trust-policy-ignore-after=1y
+
+# Exclude specific packages from trust policy
+unpm install --trust-policy-exclude=my-internal-pkg
+```
+
+### Configuration
+
+```json
+{
+  "unpm": {
+    "trustPolicy": "no-downgrade",
+    "trustPolicyIgnoreAfter": "1y",
+    "trustPolicyExclude": ["internal-pkg"]
+  }
+}
+```
+
+## Blocking Exotic Subdependencies
+
+Exotic subdependencies (git URLs, tarballs) bypass registry security and can introduce unvetted code:
+
+```bash
+# Enable blocking of exotic subdeps
+unpm install --block-exotic-subdeps
+
+# Disable blocking
+unpm install --no-block-exotic-subdeps
+```
+
+This feature is opt-in. Enable it during migration:
+
+```bash
+unpm migrate --block-exotic-subdeps
+```
+
 ## Strict Mode
 
 For CI/CD environments and high-security use cases, UNPM provides strict mode which enables additional protections:
@@ -103,6 +151,20 @@ UNPM_STRICT=true unpm install
 | explore command | Requires `--allow-explore` | Completely blocked |
 | --force-scripts | Allowed | Blocked |
 | ci frozen lockfile | Default | Enforced |
+| Unreviewed build scripts | Warning | Fail |
+| Audit failures | Warning | Fail (if auditAfterInstall enabled) |
+
+### Strict Dep Builds
+
+In strict mode, installation fails if any packages have build scripts that are not in the allowlist:
+
+```bash
+# This will fail if esbuild is not in allowlist
+unpm --strict install
+
+# To fix, add the package to allowlist:
+unpm allow-scripts add esbuild
+```
 
 ### Configuration
 
@@ -113,11 +175,29 @@ You can configure strict mode in `package.json`:
   "unpm": {
     "strict": {
       "enabled": true,
-      "minReleaseAgeDays": 7
+      "minReleaseAgeDays": 7,
+      "strictDepBuilds": true,
+      "blockAuditFailures": true,
+      "auditLevel": "high"
     }
   }
 }
 ```
+
+## Post-Install Audit
+
+UNPM can run a security audit automatically after install:
+
+```json
+{
+  "unpm": {
+    "auditAfterInstall": true,
+    "auditLevel": "high"
+  }
+}
+```
+
+In strict mode with `blockAuditFailures: true`, audit failures will cause the install to fail.
 
 ## dlx Security
 
@@ -231,3 +311,52 @@ Initialize LavaMoat configuration:
 ```bash
 unpm setup-lavamoat
 ```
+
+### Reviewing Script Allowlist
+
+Review all packages with install scripts and their allowlist status:
+
+```bash
+unpm allow-scripts review
+```
+
+This shows:
+- **Allowed**: Packages with scripts that are in the allowlist
+- **Blocked**: Packages with scripts that are NOT in the allowlist
+- **Stale**: Packages in the allowlist that are not installed or have no scripts
+
+## Package Provenance
+
+Check package attestations and provenance information:
+
+```bash
+# Show provenance info for a package
+unpm provenance lodash
+unpm prov react@18.2.0
+```
+
+This displays:
+- Repository and homepage links
+- Package maintainers
+- Publisher information
+- Integrity hashes
+- Attestations (if published with provenance)
+- Signatures
+- Security summary
+
+## Security Doctor
+
+Run security-focused diagnostics:
+
+```bash
+unpm doctor --security
+```
+
+This checks:
+- Trust policy configuration
+- Minimum release age settings
+- Lockfile presence and git status
+- Stale allowlist entries
+- Exotic sources in direct dependencies
+- Migration status
+- npm blocking mechanisms

@@ -578,6 +578,46 @@ describe('CLI Unused Command', () => {
   });
 });
 
+describe('CLI New Security Features', () => {
+  it('should show help for provenance', async () => {
+    const result = await execa('node', [cliPath, 'provenance', '--help'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('should show provenance help when no package specified', async () => {
+    const result = await execa('node', [cliPath, 'provenance'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain('provenance');
+  });
+
+  it('should show help for doctor --security', async () => {
+    const result = await execa('node', [cliPath, 'doctor', '--help'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('should show allow-scripts review in help', async () => {
+    const result = await execa('node', [cliPath, 'allow-scripts'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('review');
+  });
+
+  it('should show help for migrate with --block-exotic-subdeps', async () => {
+    const result = await execa('node', [cliPath, 'migrate', '--help'], {
+      reject: false,
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('block-exotic-subdeps');
+  });
+});
+
 describe('CLI Lockfile Warnings', () => {
   it('should warn when no lockfile exists', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'unpm-lockfile-'));

@@ -31,6 +31,12 @@ UNPM supports all npm commands. This is a complete reference.
 | `--no-min-release-age` | Disable minimum release age check |
 | `--force-scripts` | Allow all dependency scripts to run |
 | `--strict` | Enable strict security mode |
+| `--trust-policy=<mode>` | Set trust policy (`no-downgrade` or `none`) |
+| `--trust-policy-ignore-after=<duration>` | Ignore packages unchanged for longer (e.g., `1y`) |
+| `--trust-policy-exclude=<pkg>` | Exclude package from trust policy |
+| `--no-trust-policy` | Disable trust policy |
+| `--block-exotic-subdeps` | Block git/tarball subdependencies |
+| `--no-block-exotic-subdeps` | Allow git/tarball subdependencies |
 
 ## Run Commands
 
@@ -80,6 +86,7 @@ UNPM supports all npm commands. This is a complete reference.
 |---------|-------------|
 | `unpm ping` | Check registry connectivity |
 | `unpm doctor` | Run environment diagnostics |
+| `unpm doctor --security` | Run security-focused diagnostics |
 | `unpm help-search <term>` | Search help documentation |
 
 ## Security Commands
@@ -91,6 +98,9 @@ UNPM supports all npm commands. This is a complete reference.
 | `unpm allow-scripts add <pkg>` | Allow package scripts |
 | `unpm allow-scripts list` | List allowed packages |
 | `unpm allow-scripts remove <pkg>` | Remove from allowlist |
+| `unpm allow-scripts review` | Review script allowlist status |
+| `unpm provenance <pkg>` | Show package provenance/attestation info |
+| `unpm prov <pkg>` | Alias for provenance |
 | `unpm unused` | Check for unused dependencies |
 | `unpm unused --fix` | Remove unused dependencies |
 | `unpm unused --everything` | Full analysis (files, exports, types) |
@@ -130,8 +140,11 @@ UNPM supports all npm commands. This is a complete reference.
 | Command | Description |
 |---------|-------------|
 | `unpm migrate` | Migrate from npm to unpm |
+| `unpm migrate --block-exotic-subdeps` | Migrate with exotic subdeps blocking |
 | `unpm setup-lavamoat` | Initialize LavaMoat config |
 | `unpm allow-scripts` | Manage script allowlist |
+| `unpm provenance <pkg>` | Show package provenance info |
+| `unpm doctor --security` | Run security diagnostics |
 
 ## Flag Mapping
 

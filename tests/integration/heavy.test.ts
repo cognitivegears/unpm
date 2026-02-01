@@ -1492,3 +1492,530 @@ describe.skipIf(!HEAVY_TESTS)(
     }, 180000);
   }
 );
+
+describe.skipIf(!HEAVY_TESTS)(
+  'Heavy Integration Tests - Trust Policy',
+  () => {
+    let tempDir: string;
+
+    beforeAll(async () => {
+      tempDir = await mkdtemp(join(tmpdir(), 'unpm-trust-policy-'));
+    });
+
+    afterAll(async () => {
+      if (tempDir) {
+        await rm(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should apply trust policy by default', async () => {
+      const projectDir = join(tempDir, 'trust-policy-default');
+      await mkdir(projectDir, { recursive: true });
+
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'trust-policy-test',
+          version: '1.0.0',
+        })
+      );
+
+      // Run with verbose to see trust policy flags
+      const result = await execa(
+        'node',
+        [cliPath, '-v', 'add', 'is-odd@3.0.1'],
+        {
+          reject: false,
+          cwd: projectDir,
+          timeout: 120000,
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      // Trust policy should be applied by default
+      const output = result.stdout + result.stderr;
+      expect(output).toContain('trust-policy');
+    }, 120000);
+
+    it('should respect --no-trust-policy flag', async () => {
+      const projectDir = join(tempDir, 'no-trust-policy');
+      await mkdir(projectDir, { recursive: true });
+
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'no-trust-policy-test',
+          version: '1.0.0',
+        })
+      );
+
+      // Run with --no-trust-policy
+      const result = await execa(
+        'node',
+        [cliPath, '-v', 'add', '--no-trust-policy', 'is-odd@3.0.1'],
+        {
+          reject: false,
+          cwd: projectDir,
+          timeout: 120000,
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      // Trust policy should be disabled
+      const output = result.stdout + result.stderr;
+      // When disabled, trust-policy=no-downgrade should NOT appear
+      expect(output).not.toContain('trust-policy=no-downgrade');
+    }, 120000);
+
+    it('should use trust policy config from package.json', async () => {
+      const projectDir = join(tempDir, 'trust-policy-config');
+      await mkdir(projectDir, { recursive: true });
+
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'trust-policy-config-test',
+          version: '1.0.0',
+          unpm: {
+            trustPolicy: 'none',
+          },
+        })
+      );
+
+      // Run install - trust policy should be 'none' from config
+      const result = await execa(
+        'node',
+        [cliPath, '-v', 'add', 'is-odd@3.0.1'],
+        {
+          reject: false,
+          cwd: projectDir,
+          timeout: 120000,
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+    }, 120000);
+  }
+);
+
+describe.skipIf(!HEAVY_TESTS)(
+  'Heavy Integration Tests - Provenance Command',
+  () => {
+    it('should show provenance info for a real package', async () => {
+      const result = await execa('node', [cliPath, 'provenance', 'lodash'], {
+        reject: false,
+        timeout: 60000,
+      });
+
+      expect(result.exitCode).toBe(0);
+      // Should show package info
+      expect(result.stdout).toContain('lodash');
+      expect(result.stdout).toContain('Repository');
+      expect(result.stdout).toContain('Maintainers');
+    }, 60000);
+
+    it('should show provenance info with version specifier', async () => {
+      const result = await execa(
+        'node',
+        [cliPath, 'provenance', 'is-odd@3.0.1'],
+        {
+          reject: false,
+          timeout: 60000,
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('is-odd');
+      expect(result.stdout).toContain('3.0.1');
+    }, 60000);
+
+    it('should use prov alias', async () => {
+      const result = await execa('node', [cliPath, 'prov', 'is-odd'], {
+        reject: false,
+        timeout: 60000,
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('is-odd');
+    }, 60000);
+
+    it('should fail gracefully for non-existent package', async () => {
+      const result = await execa(
+        'node',
+        [cliPath, 'provenance', 'this-package-does-not-exist-12345'],
+        {
+          reject: false,
+          timeout: 60000,
+        }
+      );
+
+      expect(result.exitCode).toBe(1);
+    }, 60000);
+  }
+);
+
+describe.skipIf(!HEAVY_TESTS)(
+  'Heavy Integration Tests - Doctor Security',
+  () => {
+    let tempDir: string;
+
+    beforeAll(async () => {
+      tempDir = await mkdtemp(join(tmpdir(), 'unpm-doctor-'));
+    });
+
+    afterAll(async () => {
+      if (tempDir) {
+        await rm(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should run security diagnostics', async () => {
+      const projectDir = join(tempDir, 'doctor-security');
+      await mkdir(projectDir, { recursive: true });
+
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'doctor-security-test',
+          version: '1.0.0',
+        })
+      );
+
+      const result = await execa('node', [cliPath, 'doctor', '--security'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 60000,
+      });
+
+      // Should show security checks
+      expect(result.stdout).toContain('Trust Policy');
+      expect(result.stdout).toContain('Minimum Release Age');
+    }, 60000);
+
+    it('should warn about missing lockfile', async () => {
+      const projectDir = join(tempDir, 'doctor-no-lockfile');
+      await mkdir(projectDir, { recursive: true });
+
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'doctor-no-lockfile-test',
+          version: '1.0.0',
+        })
+      );
+
+      const result = await execa('node', [cliPath, 'doctor', '--security'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 60000,
+      });
+
+      // Should warn about missing lockfile
+      expect(result.stdout).toContain('Lockfile');
+    }, 60000);
+
+    it('should pass all checks for properly configured project', async () => {
+      const projectDir = join(tempDir, 'doctor-good-project');
+      await mkdir(projectDir, { recursive: true });
+
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'doctor-good-test',
+          version: '1.0.0',
+          unpm: {
+            trustPolicy: 'no-downgrade',
+            minReleaseAge: '2d',
+          },
+        })
+      );
+
+      // Create a lockfile
+      await writeFile(
+        join(projectDir, 'pnpm-lock.yaml'),
+        'lockfileVersion: 9.0\n'
+      );
+
+      const result = await execa('node', [cliPath, 'doctor', '--security'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 60000,
+      });
+
+      expect(result.exitCode).toBe(0);
+    }, 60000);
+  }
+);
+
+describe.skipIf(!HEAVY_TESTS)(
+  'Heavy Integration Tests - Allow Scripts Review',
+  () => {
+    let tempDir: string;
+
+    beforeAll(async () => {
+      tempDir = await mkdtemp(join(tmpdir(), 'unpm-allowscripts-review-'));
+    });
+
+    afterAll(async () => {
+      if (tempDir) {
+        await rm(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should review script allowlist with installed packages', async () => {
+      const projectDir = join(tempDir, 'review-test');
+      await mkdir(projectDir, { recursive: true });
+
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'review-test',
+          version: '1.0.0',
+          dependencies: {
+            esbuild: '^0.20.0',
+          },
+          lavamoat: {
+            allowScripts: {
+              esbuild: true,
+            },
+          },
+        })
+      );
+
+      // Install packages first
+      const installResult = await execa('node', [cliPath, 'install'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 120000,
+      });
+      expect(installResult.exitCode).toBeLessThanOrEqual(1);
+
+      // Review allowlist
+      const result = await execa('node', [cliPath, 'allow-scripts', 'review'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 60000,
+      });
+
+      expect(result.exitCode).toBe(0);
+      // Should show the review output
+      const output = result.stdout + result.stderr;
+      expect(output).toContain('esbuild');
+    }, 180000);
+
+    it('should detect stale allowlist entries', async () => {
+      const projectDir = join(tempDir, 'stale-entries');
+      await mkdir(projectDir, { recursive: true });
+
+      // Create package.json with stale allowlist entry (package not installed)
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'stale-entries-test',
+          version: '1.0.0',
+          lavamoat: {
+            allowScripts: {
+              'non-existent-package': true,
+            },
+          },
+        })
+      );
+
+      // Review without installing anything
+      const result = await execa('node', [cliPath, 'allow-scripts', 'review'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 60000,
+      });
+
+      expect(result.exitCode).toBe(0);
+      // Should mention stale entries
+      const output = result.stdout + result.stderr;
+      expect(output.toLowerCase()).toMatch(/stale|not installed/);
+    }, 60000);
+  }
+);
+
+describe.skipIf(!HEAVY_TESTS)(
+  'Heavy Integration Tests - Strict Dep Builds',
+  () => {
+    let tempDir: string;
+
+    beforeAll(async () => {
+      tempDir = await mkdtemp(join(tmpdir(), 'unpm-strict-dep-builds-'));
+    });
+
+    afterAll(async () => {
+      if (tempDir) {
+        await rm(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should fail in strict mode when packages have unreviewed build scripts', async () => {
+      const projectDir = join(tempDir, 'unreviewed-scripts');
+      await mkdir(projectDir, { recursive: true });
+
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'unreviewed-scripts-test',
+          version: '1.0.0',
+          dependencies: {
+            esbuild: '^0.20.0',
+          },
+          // Note: esbuild is NOT in the allowlist
+        })
+      );
+
+      // First, install normally to populate node_modules
+      const installResult = await execa('node', [cliPath, 'install'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 120000,
+      });
+      expect(installResult.exitCode).toBeLessThanOrEqual(1);
+
+      // Verify esbuild is installed
+      const hasEsbuild = await fileExists(join(projectDir, 'node_modules', 'esbuild'));
+      expect(hasEsbuild).toBe(true);
+
+      // Create a lockfile for strict mode validation
+      await writeFile(
+        join(projectDir, 'package-lock.json'),
+        JSON.stringify({
+          name: 'unreviewed-scripts-test',
+          version: '1.0.0',
+          lockfileVersion: 3,
+          packages: {},
+        })
+      );
+
+      // Now run install in strict mode - should fail due to unreviewed build scripts
+      const result = await execa('node', [cliPath, '--strict', 'install'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 120000,
+        env: { ...process.env, CI: 'true' }, // Avoid pnpm TTY prompt
+      });
+
+      // Should fail because esbuild has build scripts and is not in allowlist
+      expect(result.exitCode).toBe(1);
+      const output = result.stdout + result.stderr;
+      expect(output.toLowerCase()).toMatch(/unreviewed|build scripts|allowlist/);
+    }, 180000);
+
+    it('should pass strict mode when build scripts are in allowlist', async () => {
+      const projectDir = join(tempDir, 'reviewed-scripts');
+      await mkdir(projectDir, { recursive: true });
+
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'reviewed-scripts-test',
+          version: '1.0.0',
+          dependencies: {
+            esbuild: '^0.20.0',
+          },
+          lavamoat: {
+            allowScripts: {
+              esbuild: true,
+            },
+          },
+        })
+      );
+
+      // First, install normally to populate node_modules
+      const installResult = await execa('node', [cliPath, 'install'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 120000,
+      });
+      expect(installResult.exitCode).toBeLessThanOrEqual(1);
+
+      // Create lockfile for strict mode validation
+      await writeFile(
+        join(projectDir, 'package-lock.json'),
+        JSON.stringify({
+          name: 'reviewed-scripts-test',
+          version: '1.0.0',
+          lockfileVersion: 3,
+          packages: {},
+        })
+      );
+
+      // Install in strict mode - should succeed because esbuild is in allowlist
+      const result = await execa('node', [cliPath, '--strict', 'install'], {
+        reject: false,
+        cwd: projectDir,
+        timeout: 120000,
+        env: { ...process.env, CI: 'true' }, // Avoid pnpm TTY prompt
+      });
+
+      // Should succeed
+      expect(result.exitCode).toBe(0);
+    }, 180000);
+  }
+);
+
+describe.skipIf(!HEAVY_TESTS)(
+  'Heavy Integration Tests - Migration with Block Exotic Subdeps',
+  () => {
+    let tempDir: string;
+
+    beforeAll(async () => {
+      tempDir = await mkdtemp(join(tmpdir(), 'unpm-migrate-exotic-'));
+    });
+
+    afterAll(async () => {
+      if (tempDir) {
+        await rm(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should set blockExoticSubdeps during migration', async () => {
+      const projectDir = join(tempDir, 'migrate-exotic');
+      await mkdir(projectDir, { recursive: true });
+
+      await writeFile(
+        join(projectDir, 'package.json'),
+        JSON.stringify({
+          name: 'migrate-exotic-test',
+          version: '1.0.0',
+        })
+      );
+
+      await writeFile(
+        join(projectDir, 'package-lock.json'),
+        JSON.stringify({
+          name: 'migrate-exotic-test',
+          version: '1.0.0',
+          lockfileVersion: 3,
+          packages: {},
+        })
+      );
+
+      // Migrate with --block-exotic-subdeps
+      const result = await execa(
+        'node',
+        [cliPath, 'migrate', '--block-exotic-subdeps'],
+        {
+          reject: false,
+          cwd: projectDir,
+          timeout: 180000,
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+
+      // Verify package.json has blockExoticSubdeps set
+      const pkgJson = JSON.parse(
+        await readFile(join(projectDir, 'package.json'), 'utf-8')
+      );
+      expect(pkgJson.unpm?.blockExoticSubdeps).toBe(true);
+
+      // Verify .pnpmrc has block-exotic-subdeps
+      const pnpmrc = await readFile(join(projectDir, '.pnpmrc'), 'utf-8');
+      expect(pnpmrc).toContain('block-exotic-subdeps=true');
+    }, 180000);
+  }
+);

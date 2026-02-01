@@ -23,6 +23,15 @@ export interface UnpmConfig {
   trustedPackages: string[];
   lavamoatEnabled: boolean;
   migrated?: boolean;
+  // Trust policy settings
+  trustPolicy?: 'no-downgrade' | 'none';
+  trustPolicyIgnoreAfter?: string | number;
+  trustPolicyExclude?: string[];
+  // Exotic subdeps blocking
+  blockExoticSubdeps?: boolean;
+  // Audit settings
+  auditAfterInstall?: boolean;
+  auditLevel?: 'low' | 'moderate' | 'high' | 'critical';
 }
 
 const defaultConfig: UnpmConfig = {

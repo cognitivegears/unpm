@@ -611,11 +611,16 @@ export function createCli(): Command {
     .description('Migrate from npm to unpm/pnpm')
     .option('--dry-run', 'Show what would be done without making changes')
     .option('--skip-lavamoat', 'Skip LavaMoat configuration')
+    .option(
+      '--block-exotic-subdeps',
+      'Enable blocking of exotic subdependencies (git/tarball URLs)'
+    )
     .allowUnknownOption()
     .action(async (opts, cmd) => {
       const args: string[] = [];
       if (opts.dryRun) args.push('--dry-run');
       if (opts.skipLavamoat) args.push('--skip-lavamoat');
+      if (opts.blockExoticSubdeps) args.push('--block-exotic-subdeps');
       args.push(...cmd.args);
       process.exitCode = await commands.migrate(args);
     });
@@ -641,6 +646,14 @@ export function createCli(): Command {
     .allowUnknownOption()
     .action(async (_opts, cmd) => {
       process.exitCode = await commands.unused(cmd.args);
+    });
+
+  program
+    .command('provenance [package]')
+    .alias('prov')
+    .description('Show package attestation/provenance info')
+    .action(async (pkg?: string) => {
+      process.exitCode = await commands.provenance(pkg ? [pkg] : []);
     });
 
   // Fallback handler for any unknown commands
