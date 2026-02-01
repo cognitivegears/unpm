@@ -1,7 +1,12 @@
 import { unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import chalk from 'chalk';
-import { hasPackageLock, hasPnpmLock, fileExists } from '../utils/config.js';
+import {
+  hasPackageLock,
+  hasPnpmLock,
+  fileExists,
+  isMigrated as isProjectMigrated,
+} from '../utils/config.js';
 import { execPnpm, execNpm } from '../utils/exec.js';
 import { isStrictMode } from './strict-mode.js';
 import { logger } from '../utils/logger.js';
@@ -31,8 +36,8 @@ export function getCompatibilityFlags(mode: MigrationModeResult): string[] {
 /**
  * Detect whether the project is in pre-migration or post-migration mode.
  *
- * Pre-migration: pnpm-lock.yaml does NOT exist (npm interop enabled)
- * Post-migration: pnpm-lock.yaml exists (pnpm-only mode)
+ * Pre-migration: unpm.migrated is NOT set in package.json (npm interop enabled)
+ * Post-migration: unpm.migrated is true in package.json (pnpm-only mode)
  */
 export async function detectMigrationMode(
   cwd?: string
@@ -40,9 +45,10 @@ export async function detectMigrationMode(
   const dir = cwd ?? process.cwd();
   const hasNpmLock = await hasPackageLock(dir);
   const hasPnpm = await hasPnpmLock(dir);
+  const migrated = await isProjectMigrated(dir);
 
   return {
-    mode: hasPnpm ? 'post-migration' : 'pre-migration',
+    mode: migrated ? 'post-migration' : 'pre-migration',
     hasPackageLock: hasNpmLock,
     hasPnpmLock: hasPnpm,
   };
@@ -201,10 +207,10 @@ export async function cleanupTempLockfile(cwd?: string): Promise<void> {
 }
 
 /**
- * Check if the project has been migrated (pnpm-lock.yaml exists as migration marker).
+ * Check if the project has been migrated (unpm.migrated flag in package.json).
  */
 export async function isMigrated(cwd?: string): Promise<boolean> {
-  return hasPnpmLock(cwd);
+  return isProjectMigrated(cwd);
 }
 
 /**

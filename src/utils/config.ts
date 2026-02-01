@@ -22,6 +22,7 @@ export interface UnpmConfig {
   allowDependencyScripts: boolean;
   trustedPackages: string[];
   lavamoatEnabled: boolean;
+  migrated?: boolean;
 }
 
 const defaultConfig: UnpmConfig = {
@@ -120,8 +121,9 @@ export async function hasPnpmLock(cwd?: string): Promise<boolean> {
 
 /**
  * Check if the project has been migrated to pnpm.
- * A project is considered migrated if pnpm-lock.yaml exists.
+ * A project is considered migrated if the unpm.migrated flag is set in package.json.
  */
 export async function isMigrated(cwd?: string): Promise<boolean> {
-  return hasPnpmLock(cwd);
+  const config = await getUnpmConfig(cwd);
+  return config.migrated === true;
 }

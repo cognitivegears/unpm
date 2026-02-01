@@ -66,6 +66,7 @@ unpm migrate --skip-lavamoat
 
 | Aspect | Pre-Migration | Post-Migration |
 |--------|---------------|----------------|
+| Migration marker | `unpm.migrated` not set | `unpm.migrated: true` in package.json |
 | Lockfile | `package-lock.json` | `pnpm-lock.yaml` |
 | npm commands | Work normally | Blocked with helpful message |
 | unpm commands | Sync with npm lockfile | Use pnpm lockfile directly |
@@ -211,7 +212,7 @@ The `unpm migrate` command creates/modifies:
 To revert to npm-only workflow:
 
 ```bash
-# Remove pnpm-lock.yaml (triggers pre-migration mode)
+# Remove pnpm-lock.yaml
 rm pnpm-lock.yaml
 
 # Remove npm blocking files
@@ -219,9 +220,29 @@ rm npm-shrinkwrap.json
 rm .npmrc  # or edit to remove engine-strict=true
 
 # Edit package.json to remove:
+# - "unpm.migrated" field (or the entire "unpm" section)
 # - "engines.npm" field
 # - "preinstall" script
 
 # Generate fresh package-lock.json
 npm install
 ```
+
+## Known Limitations
+
+### Concurrent Operations in Pre-Migration Mode
+
+In pre-migration mode, running multiple `unpm` commands simultaneously (e.g., in parallel CI jobs or multiple terminal windows) can cause lockfile corruption:
+
+1. Process A runs `unpm install`, creates temporary `pnpm-lock.yaml`
+2. Process B runs `unpm add`, imports the same file
+3. Both processes modify the lockfile
+4. Whichever process exports last may produce an inconsistent `package-lock.json`
+
+**Recommendations:**
+
+- Avoid running concurrent `unpm` commands in pre-migration mode
+- For CI environments with parallel jobs, migrate fully using `unpm migrate`
+- If you encounter lockfile inconsistencies, delete `node_modules` and `pnpm-lock.yaml`, then run `unpm install` again
+
+This limitation does not apply after migration, as post-migration mode uses pnpm's native lockfile handling.

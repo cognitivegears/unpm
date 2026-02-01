@@ -100,20 +100,19 @@ export async function migrate(args: string[]): Promise<number> {
   }
   logger.info('');
 
-  // Step 4: Add unpm config to package.json
+  // Step 4: Add unpm config to package.json (including migrated flag)
   logger.info('Adding unpm configuration to package.json...');
   if (!dryRun) {
-    if (!packageJson['unpm']) {
-      packageJson['unpm'] = {
-        allowLocalScripts: true,
-        allowDependencyScripts: false,
-        lavamoatEnabled: true,
-      };
-      await writePackageJson(packageJson, cwd);
-      logger.success('Added unpm configuration');
-    } else {
-      logger.info('unpm configuration already exists');
-    }
+    const existingUnpm = packageJson['unpm'] as Record<string, unknown> | undefined;
+    packageJson['unpm'] = {
+      ...existingUnpm,
+      migrated: true,
+      allowLocalScripts: existingUnpm?.allowLocalScripts ?? true,
+      allowDependencyScripts: existingUnpm?.allowDependencyScripts ?? false,
+      lavamoatEnabled: existingUnpm?.lavamoatEnabled ?? true,
+    };
+    await writePackageJson(packageJson, cwd);
+    logger.success('Added unpm configuration (migrated: true)');
   } else {
     logger.info('  [dry-run] Would add unpm config to package.json');
   }
@@ -289,6 +288,7 @@ minimum-release-age=2d
   logger.info(chalk.bold('Migration complete!'));
   logger.info('');
   logger.info('What changed:');
+  logger.info('  - unpm.migrated set to true in package.json');
   logger.info('  - pnpm-lock.yaml created (replaces package-lock.json)');
   if (hasNpmLock) {
     logger.info('  - package-lock.json removed');

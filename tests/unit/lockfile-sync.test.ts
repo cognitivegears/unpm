@@ -17,6 +17,7 @@ vi.mock('../../src/utils/config.js', () => ({
   hasPackageLock: vi.fn(),
   hasPnpmLock: vi.fn(),
   fileExists: vi.fn(),
+  isMigrated: vi.fn(),
 }));
 
 vi.mock('../../src/utils/exec.js', () => ({
@@ -37,7 +38,8 @@ describe('detectMigrationMode', () => {
     vi.resetAllMocks();
   });
 
-  it('should return pre-migration when pnpm-lock.yaml does not exist', async () => {
+  it('should return pre-migration when unpm.migrated is not set', async () => {
+    vi.mocked(configModule.isMigrated).mockResolvedValue(false);
     vi.mocked(configModule.hasPnpmLock).mockResolvedValue(false);
     vi.mocked(configModule.hasPackageLock).mockResolvedValue(true);
 
@@ -48,7 +50,8 @@ describe('detectMigrationMode', () => {
     expect(result.hasPnpmLock).toBe(false);
   });
 
-  it('should return post-migration when pnpm-lock.yaml exists', async () => {
+  it('should return post-migration when unpm.migrated is true', async () => {
+    vi.mocked(configModule.isMigrated).mockResolvedValue(true);
     vi.mocked(configModule.hasPnpmLock).mockResolvedValue(true);
     vi.mocked(configModule.hasPackageLock).mockResolvedValue(false);
 
@@ -59,18 +62,21 @@ describe('detectMigrationMode', () => {
     expect(result.hasPnpmLock).toBe(true);
   });
 
-  it('should return post-migration when both lockfiles exist', async () => {
+  it('should return pre-migration when pnpm-lock.yaml exists but not migrated', async () => {
+    // This tests the new behavior: pnpm-lock.yaml alone doesn't trigger post-migration
+    vi.mocked(configModule.isMigrated).mockResolvedValue(false);
     vi.mocked(configModule.hasPnpmLock).mockResolvedValue(true);
     vi.mocked(configModule.hasPackageLock).mockResolvedValue(true);
 
     const result = await detectMigrationMode('/test/path');
 
-    expect(result.mode).toBe('post-migration');
+    expect(result.mode).toBe('pre-migration');
     expect(result.hasPackageLock).toBe(true);
     expect(result.hasPnpmLock).toBe(true);
   });
 
-  it('should return pre-migration when no lockfiles exist', async () => {
+  it('should return pre-migration when no lockfiles exist and not migrated', async () => {
+    vi.mocked(configModule.isMigrated).mockResolvedValue(false);
     vi.mocked(configModule.hasPnpmLock).mockResolvedValue(false);
     vi.mocked(configModule.hasPackageLock).mockResolvedValue(false);
 
@@ -275,16 +281,16 @@ describe('isMigrated', () => {
     vi.resetAllMocks();
   });
 
-  it('should return true when pnpm-lock.yaml exists', async () => {
-    vi.mocked(configModule.hasPnpmLock).mockResolvedValue(true);
+  it('should return true when unpm.migrated is true in package.json', async () => {
+    vi.mocked(configModule.isMigrated).mockResolvedValue(true);
 
     const result = await isMigrated('/test/path');
 
     expect(result).toBe(true);
   });
 
-  it('should return false when pnpm-lock.yaml does not exist', async () => {
-    vi.mocked(configModule.hasPnpmLock).mockResolvedValue(false);
+  it('should return false when unpm.migrated is not set', async () => {
+    vi.mocked(configModule.isMigrated).mockResolvedValue(false);
 
     const result = await isMigrated('/test/path');
 

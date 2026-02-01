@@ -6,6 +6,7 @@ import {
   fileExists,
   getLavamoatAllowScripts,
   setLavamoatAllowScripts,
+  isMigrated,
 } from '../../src/utils/config.js';
 
 vi.mock('node:fs/promises');
@@ -113,5 +114,48 @@ describe('setLavamoatAllowScripts', () => {
     await expect(
       setLavamoatAllowScripts({ esbuild: true }, '/test')
     ).rejects.toThrow('package.json not found');
+  });
+});
+
+describe('isMigrated', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('should return true when unpm.migrated is true', async () => {
+    const mockPackageJson = {
+      name: 'test',
+      unpm: { migrated: true },
+    };
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify(mockPackageJson));
+
+    const result = await isMigrated('/test');
+    expect(result).toBe(true);
+  });
+
+  it('should return false when unpm.migrated is not set', async () => {
+    const mockPackageJson = {
+      name: 'test',
+      unpm: { allowLocalScripts: true },
+    };
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify(mockPackageJson));
+
+    const result = await isMigrated('/test');
+    expect(result).toBe(false);
+  });
+
+  it('should return false when unpm config does not exist', async () => {
+    const mockPackageJson = { name: 'test' };
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify(mockPackageJson));
+
+    const result = await isMigrated('/test');
+    expect(result).toBe(false);
+  });
+
+  it('should return false when package.json does not exist', async () => {
+    vi.mocked(readFile).mockRejectedValue(new Error('ENOENT'));
+
+    const result = await isMigrated('/test');
+    expect(result).toBe(false);
   });
 });
