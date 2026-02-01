@@ -27,6 +27,7 @@ import {
   preSyncLockfile,
   postSyncLockfile,
   cleanupTempLockfile,
+  getCompatibilityFlags,
 } from '../security/lockfile-sync.js';
 import { logger } from '../utils/logger.js';
 
@@ -221,12 +222,13 @@ export async function install(
     }
   }
 
-  // Run pnpm install with release age flags
+  // Run pnpm install with release age flags and compatibility flags
   const pnpmArgs = [
     'install',
     ...packages,
     ...removeStrictFlag(mappedFlags),
     ...releaseAgeConfig.flags,
+    ...getCompatibilityFlags(mode),
   ];
   const result = await spawnPnpm(pnpmArgs);
 
@@ -334,11 +336,12 @@ export async function ci(
     }
   }
 
-  // Run pnpm install with frozen lockfile and release age flags
+  // Run pnpm install with frozen lockfile, release age flags, and compatibility flags
   const pnpmArgs = [
     'install',
     ...removeStrictFlag(mappedArgs),
     ...releaseAgeConfig.flags,
+    ...getCompatibilityFlags(mode),
   ];
   const result = await spawnPnpm(pnpmArgs);
 
@@ -423,12 +426,13 @@ export async function add(
     mappedFlags = [...getSecurityFlags(), ...mappedFlags];
   }
 
-  // Run pnpm add with release age flags
+  // Run pnpm add with release age flags and compatibility flags
   const pnpmArgs = [
     'add',
     ...packages,
     ...removeStrictFlag(mappedFlags),
     ...releaseAgeConfig.flags,
+    ...getCompatibilityFlags(mode),
   ];
   const result = await spawnPnpm(pnpmArgs);
 
@@ -483,7 +487,11 @@ export async function remove(
   }
 
   const mappedArgs = mapNpmFlagsToPnpm(removeUnpmFlags(args));
-  const pnpmArgs = ['remove', ...removeStrictFlag(mappedArgs)];
+  const pnpmArgs = [
+    'remove',
+    ...removeStrictFlag(mappedArgs),
+    ...getCompatibilityFlags(mode),
+  ];
   const result = await spawnPnpm(pnpmArgs);
 
   if (result.exitCode !== 0) {
@@ -553,11 +561,12 @@ export async function update(
     mappedArgs = [...getSecurityFlags(), ...mappedArgs];
   }
 
-  // Run pnpm update with release age flags
+  // Run pnpm update with release age flags and compatibility flags
   const pnpmArgs = [
     'update',
     ...removeStrictFlag(mappedArgs),
     ...releaseAgeConfig.flags,
+    ...getCompatibilityFlags(mode),
   ];
   const result = await spawnPnpm(pnpmArgs);
 

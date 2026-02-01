@@ -5,6 +5,7 @@ import {
   postSyncLockfile,
   cleanupTempLockfile,
   isMigrated,
+  getCompatibilityFlags,
 } from '../../src/security/lockfile-sync.js';
 import * as configModule from '../../src/utils/config.js';
 import * as execModule from '../../src/utils/exec.js';
@@ -288,5 +289,43 @@ describe('isMigrated', () => {
     const result = await isMigrated('/test/path');
 
     expect(result).toBe(false);
+  });
+});
+
+describe('getCompatibilityFlags', () => {
+  it('should return --shamefully-hoist in pre-migration mode', () => {
+    const mode = {
+      mode: 'pre-migration' as const,
+      hasPackageLock: true,
+      hasPnpmLock: false,
+    };
+
+    const flags = getCompatibilityFlags(mode);
+
+    expect(flags).toEqual(['--shamefully-hoist']);
+  });
+
+  it('should return empty array in post-migration mode', () => {
+    const mode = {
+      mode: 'post-migration' as const,
+      hasPackageLock: false,
+      hasPnpmLock: true,
+    };
+
+    const flags = getCompatibilityFlags(mode);
+
+    expect(flags).toEqual([]);
+  });
+
+  it('should return empty array in post-migration mode even with both lockfiles', () => {
+    const mode = {
+      mode: 'post-migration' as const,
+      hasPackageLock: true,
+      hasPnpmLock: true,
+    };
+
+    const flags = getCompatibilityFlags(mode);
+
+    expect(flags).toEqual([]);
   });
 });

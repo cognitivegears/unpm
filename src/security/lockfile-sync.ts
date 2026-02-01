@@ -15,6 +15,20 @@ export interface MigrationModeResult {
 }
 
 /**
+ * Get flags needed for npm compatibility in pre-migration mode.
+ *
+ * In pre-migration mode, we use --shamefully-hoist to create a flat node_modules
+ * structure compatible with npm. This allows npm and unpm to be used interchangeably
+ * by different team members.
+ */
+export function getCompatibilityFlags(mode: MigrationModeResult): string[] {
+  if (mode.mode === 'pre-migration') {
+    return ['--shamefully-hoist'];
+  }
+  return [];
+}
+
+/**
  * Detect whether the project is in pre-migration or post-migration mode.
  *
  * Pre-migration: pnpm-lock.yaml does NOT exist (npm interop enabled)
