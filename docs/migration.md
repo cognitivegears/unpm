@@ -43,10 +43,14 @@ This will:
 1. Convert `package-lock.json` to `pnpm-lock.yaml`
 2. Delete `package-lock.json`
 3. Set `packageManager` field in package.json (for corepack)
-4. Add preinstall script to block npm
-5. Create `.pnpmrc` with secure defaults
-6. Initialize LavaMoat configuration
-7. Install dependencies securely
+4. Block npm via multiple mechanisms:
+   - `engines.npm` constraint in package.json
+   - `npm-shrinkwrap.json` (triggers engine check before node_modules parsing)
+   - preinstall script (backup for edge cases)
+5. Create `.npmrc` with `engine-strict=true`
+6. Create `.pnpmrc` with secure defaults
+7. Initialize LavaMoat configuration
+8. Install dependencies securely
 
 ### Migration Options
 
@@ -164,7 +168,27 @@ The `unpm migrate` command creates/modifies:
      "packageManager": "pnpm@9.15.0"
    }
    ```
-3. **`preinstall` script** - Blocks npm with clear message
+3. **`engines.npm` constraint** - Blocks npm commands
+   ```json
+   {
+     "engines": {
+       "npm": "use-pnpm-instead"
+     }
+   }
+   ```
+4. **`npm-shrinkwrap.json`** - Triggers engine check before node_modules parsing
+   ```json
+   {
+     "name": "your-package",
+     "lockfileVersion": 3,
+     "packages": {
+       "": {
+         "engines": { "npm": "use-pnpm-instead" }
+       }
+     }
+   }
+   ```
+5. **`preinstall` script** - Backup blocking mechanism
    ```json
    {
      "scripts": {
@@ -172,7 +196,11 @@ The `unpm migrate` command creates/modifies:
      }
    }
    ```
-4. **`.pnpmrc`** - Secure pnpm defaults for direct pnpm usage
+6. **`.npmrc`** - Enforces the engines constraint
+   ```ini
+   engine-strict=true
+   ```
+7. **`.pnpmrc`** - Secure pnpm defaults for direct pnpm usage
    ```ini
    ignore-scripts=true
    minimum-release-age=2d
@@ -186,8 +214,13 @@ To revert to npm-only workflow:
 # Remove pnpm-lock.yaml (triggers pre-migration mode)
 rm pnpm-lock.yaml
 
-# Remove the blocking preinstall script
-# Edit package.json to remove "preinstall" from scripts
+# Remove npm blocking files
+rm npm-shrinkwrap.json
+rm .npmrc  # or edit to remove engine-strict=true
+
+# Edit package.json to remove:
+# - "engines.npm" field
+# - "preinstall" script
 
 # Generate fresh package-lock.json
 npm install

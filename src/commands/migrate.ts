@@ -173,30 +173,101 @@ export async function migrate(args: string[]): Promise<number> {
     logger.info('');
   }
 
-  // Step 8: Add preinstall script to block npm
-  logger.info('Adding preinstall script to block npm...');
+  // Step 8: Add engines field and preinstall script to block npm
+  // engines.npm + engine-strict blocks: npm update, npm outdated, etc.
+  // preinstall script blocks: npm install, npm ci
+  logger.info('Adding npm blocking mechanisms...');
   if (!dryRun) {
     const updatedPackageJson = await readPackageJson(cwd);
     if (updatedPackageJson) {
+      let modified = false;
+
+      // Add engines field to block npm with an unsatisfiable version
+      if (!updatedPackageJson['engines']) {
+        updatedPackageJson['engines'] = {};
+      }
+      const engines = updatedPackageJson['engines'] as Record<string, string>;
+      if (!engines['npm']) {
+        engines['npm'] = 'use-pnpm-instead';
+        modified = true;
+        logger.success('Added engines.npm constraint (blocks npm update, outdated, etc.)');
+      }
+
+      // Add preinstall script to block npm install/ci
       if (!updatedPackageJson.scripts) {
         updatedPackageJson.scripts = {};
       }
-      // Only add if there's no existing preinstall script
       if (!updatedPackageJson.scripts['preinstall']) {
         updatedPackageJson.scripts['preinstall'] =
           "node -e \"if(!process.env.npm_execpath?.includes('pnpm')){console.error('Use unpm or pnpm instead of npm');process.exit(1)}\"";
+        modified = true;
+        logger.success('Added preinstall script (blocks npm install, ci)');
+      }
+
+      if (modified) {
         await writePackageJson(updatedPackageJson, cwd);
-        logger.success('Added preinstall script to block npm');
       } else {
-        logger.info('Preinstall script already exists, skipping');
+        logger.info('npm blocking mechanisms already exist, skipping');
       }
     }
   } else {
-    logger.info('  [dry-run] Would add preinstall script to block npm');
+    logger.info('  [dry-run] Would add engines constraint and preinstall script');
   }
   logger.info('');
 
-  // Step 9: Create .pnpmrc with secure defaults
+  // Step 9: Create .npmrc with engine-strict to enforce npm blocking
+  const npmrcPath = join(cwd, '.npmrc');
+  const hasNpmrc = await fileExists(npmrcPath);
+  if (!hasNpmrc) {
+    logger.info('Creating .npmrc to enforce npm blocking...');
+    if (!dryRun) {
+      const npmrcContent = `# Block npm - use unpm or pnpm instead
+engine-strict=true
+`;
+      await writeFile(npmrcPath, npmrcContent, 'utf-8');
+      logger.success('Created .npmrc with engine-strict=true');
+    } else {
+      logger.info('  [dry-run] Would create .npmrc with engine-strict=true');
+    }
+    logger.info('');
+  }
+
+  // Step 10: Create npm-shrinkwrap.json to block npm before it parses node_modules
+  // npm reads shrinkwrap before parsing node_modules, so the engine check happens early
+  const shrinkwrapPath = join(cwd, 'npm-shrinkwrap.json');
+  const hasShrinkwrap = await fileExists(shrinkwrapPath);
+  if (!hasShrinkwrap) {
+    logger.info('Creating npm-shrinkwrap.json to block npm...');
+    if (!dryRun) {
+      const pkgJson = await readPackageJson(cwd);
+      const shrinkwrapContent = {
+        name: pkgJson?.name ?? 'unknown',
+        version: pkgJson?.version ?? '0.0.0',
+        lockfileVersion: 3,
+        requires: true,
+        packages: {
+          '': {
+            name: pkgJson?.name ?? 'unknown',
+            version: pkgJson?.version ?? '0.0.0',
+            engines: {
+              npm: 'use-pnpm-instead',
+            },
+          },
+        },
+      };
+      await writeFile(
+        shrinkwrapPath,
+        JSON.stringify(shrinkwrapContent, null, 2) + '\n',
+        'utf-8'
+      );
+      logger.success('Created npm-shrinkwrap.json (blocks npm before node_modules parsing)');
+    } else {
+      logger.info('  [dry-run] Would create npm-shrinkwrap.json');
+    }
+    logger.info('');
+  }
+
+  // Step 11: Create .pnpmrc with secure defaults
   const pnpmrcPath = join(cwd, '.pnpmrc');
   const hasPnpmrc = await fileExists(pnpmrcPath);
   if (!hasPnpmrc) {
@@ -225,7 +296,13 @@ minimum-release-age=2d
   if (pnpmVersion) {
     logger.info(`  - packageManager field set to pnpm@${pnpmVersion}`);
   }
-  logger.info('  - preinstall script added to block npm');
+  logger.info('  - npm blocking: engines.npm + shrinkwrap + preinstall');
+  if (!hasNpmrc) {
+    logger.info('  - .npmrc created with engine-strict=true');
+  }
+  if (!hasShrinkwrap) {
+    logger.info('  - npm-shrinkwrap.json created (blocks npm early)');
+  }
   if (!hasPnpmrc) {
     logger.info('  - .pnpmrc created with secure defaults');
   }

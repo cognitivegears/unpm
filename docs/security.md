@@ -216,7 +216,10 @@ UNPM_STRICT=true unpm install
 
 After `unpm migrate`:
 - `pnpm-lock.yaml` persists as the migration marker
-- npm install/update is blocked via preinstall script
+- npm is blocked via multiple mechanisms:
+  - `engines.npm` constraint in package.json
+  - `npm-shrinkwrap.json` triggers engine check before node_modules parsing
+  - preinstall script as backup
 - `.pnpmrc` is created with secure defaults for direct pnpm usage
 
 ## LavaMoat Integration

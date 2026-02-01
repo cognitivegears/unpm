@@ -100,7 +100,9 @@ pnpm add lodash
 To revert to npm (not recommended):
 ```bash
 rm pnpm-lock.yaml
-# Edit package.json to remove the "preinstall" script
+rm npm-shrinkwrap.json
+rm .npmrc  # or edit to remove engine-strict=true
+# Edit package.json to remove "engines.npm" and "preinstall" script
 npm install
 ```
 
