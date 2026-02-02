@@ -132,7 +132,9 @@ async function allowScriptsReview(): Promise<number> {
   }
 
   // Find stale entries (in allowlist but not installed or no scripts)
-  const stale = allowedPackages.filter((pkg) => !packagesWithScripts.includes(pkg));
+  const stale = allowedPackages.filter(
+    (pkg) => !packagesWithScripts.includes(pkg)
+  );
 
   logger.info(chalk.bold('Script Allowlist Review'));
   logger.info('');
@@ -174,7 +176,9 @@ async function allowScriptsReview(): Promise<number> {
 
   // Summary and suggestions
   logger.info(chalk.bold('Summary'));
-  logger.info(`  ${chalk.green(`${allowed.length} allowed`)}, ${chalk.red(`${blocked.length} blocked`)}, ${chalk.yellow(`${stale.length} stale`)}`);
+  logger.info(
+    `  ${chalk.green(`${allowed.length} allowed`)}, ${chalk.red(`${blocked.length} blocked`)}, ${chalk.yellow(`${stale.length} stale`)}`
+  );
   logger.info('');
 
   if (blocked.length > 0) {
@@ -210,7 +214,9 @@ function printAllowScriptsHelp(): void {
   logger.info('  add <pkg>     Add package(s) to the allowlist');
   logger.info('  remove <pkg>  Remove package(s) from the allowlist');
   logger.info('  list          List all allowed packages');
-  logger.info('  review        Review all packages with scripts (allowed/blocked/stale)');
+  logger.info(
+    '  review        Review all packages with scripts (allowed/blocked/stale)'
+  );
   logger.info('  init          Initialize LavaMoat configuration');
   logger.info('');
   logger.info('Examples:');

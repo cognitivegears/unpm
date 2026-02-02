@@ -58,7 +58,8 @@ async function checkTrustPolicy(cwd?: string): Promise<SecurityCheckResult> {
       name: 'Trust Policy',
       status: 'warn',
       message: 'Trust policy is disabled',
-      suggestion: 'Consider setting trustPolicy to "no-downgrade" in package.json unpm config',
+      suggestion:
+        'Consider setting trustPolicy to "no-downgrade" in package.json unpm config',
     };
   }
 
@@ -96,7 +97,9 @@ async function checkMinReleaseAge(cwd?: string): Promise<SecurityCheckResult> {
 /**
  * Check if a lockfile is present.
  */
-async function checkLockfilePresent(cwd?: string): Promise<SecurityCheckResult> {
+async function checkLockfilePresent(
+  cwd?: string
+): Promise<SecurityCheckResult> {
   const hasPnpm = await hasPnpmLock(cwd);
   const hasNpm = await hasPackageLock(cwd);
 
@@ -223,7 +226,9 @@ async function checkStaleAllowlistEntries(
 /**
  * Check for exotic sources (git/tarball URLs) in direct dependencies.
  */
-async function checkExoticDirectDeps(cwd?: string): Promise<SecurityCheckResult> {
+async function checkExoticDirectDeps(
+  cwd?: string
+): Promise<SecurityCheckResult> {
   const packageJson = await readPackageJson(cwd);
   if (!packageJson) {
     return {
@@ -267,15 +272,16 @@ async function checkExoticDirectDeps(cwd?: string): Promise<SecurityCheckResult>
     name: 'Exotic Dependencies',
     status: 'warn',
     message: `${exoticDeps.length} exotic dependencies: ${exoticDeps.slice(0, 3).join(', ')}${exoticDeps.length > 3 ? '...' : ''}`,
-    suggestion:
-      'Consider using registry packages instead of git/tarball URLs',
+    suggestion: 'Consider using registry packages instead of git/tarball URLs',
   };
 }
 
 /**
  * Check migration status.
  */
-async function checkMigrationStatus(cwd?: string): Promise<SecurityCheckResult> {
+async function checkMigrationStatus(
+  cwd?: string
+): Promise<SecurityCheckResult> {
   const packageJson = await readPackageJson(cwd);
   const unpmConfig = packageJson?.['unpm'] as
     | { migrated?: boolean }
@@ -344,9 +350,7 @@ async function checkNpmBlocking(cwd?: string): Promise<SecurityCheckResult> {
   const dir = cwd ?? process.cwd();
   const hasShrinkwrap = await fileExists(join(dir, 'npm-shrinkwrap.json'));
 
-  const hasPreinstall = packageJson?.scripts?.['preinstall']?.includes(
-    'pnpm'
-  );
+  const hasPreinstall = packageJson?.scripts?.['preinstall']?.includes('pnpm');
 
   if (hasEngineBlock && hasShrinkwrap && hasPreinstall) {
     return {

@@ -1493,110 +1493,99 @@ describe.skipIf(!HEAVY_TESTS)(
   }
 );
 
-describe.skipIf(!HEAVY_TESTS)(
-  'Heavy Integration Tests - Trust Policy',
-  () => {
-    let tempDir: string;
+describe.skipIf(!HEAVY_TESTS)('Heavy Integration Tests - Trust Policy', () => {
+  let tempDir: string;
 
-    beforeAll(async () => {
-      tempDir = await mkdtemp(join(tmpdir(), 'unpm-trust-policy-'));
+  beforeAll(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'unpm-trust-policy-'));
+  });
+
+  afterAll(async () => {
+    if (tempDir) {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should apply trust policy by default', async () => {
+    const projectDir = join(tempDir, 'trust-policy-default');
+    await mkdir(projectDir, { recursive: true });
+
+    await writeFile(
+      join(projectDir, 'package.json'),
+      JSON.stringify({
+        name: 'trust-policy-test',
+        version: '1.0.0',
+      })
+    );
+
+    // Run with verbose to see trust policy flags
+    const result = await execa('node', [cliPath, '-v', 'add', 'is-odd@3.0.1'], {
+      reject: false,
+      cwd: projectDir,
+      timeout: 120000,
     });
 
-    afterAll(async () => {
-      if (tempDir) {
-        await rm(tempDir, { recursive: true, force: true });
+    expect(result.exitCode).toBe(0);
+    // Trust policy should be applied by default
+    const output = result.stdout + result.stderr;
+    expect(output).toContain('trust-policy');
+  }, 120000);
+
+  it('should respect --no-trust-policy flag', async () => {
+    const projectDir = join(tempDir, 'no-trust-policy');
+    await mkdir(projectDir, { recursive: true });
+
+    await writeFile(
+      join(projectDir, 'package.json'),
+      JSON.stringify({
+        name: 'no-trust-policy-test',
+        version: '1.0.0',
+      })
+    );
+
+    // Run with --no-trust-policy
+    const result = await execa(
+      'node',
+      [cliPath, '-v', 'add', '--no-trust-policy', 'is-odd@3.0.1'],
+      {
+        reject: false,
+        cwd: projectDir,
+        timeout: 120000,
       }
+    );
+
+    expect(result.exitCode).toBe(0);
+    // Trust policy should be disabled
+    const output = result.stdout + result.stderr;
+    // When disabled, trust-policy=no-downgrade should NOT appear
+    expect(output).not.toContain('trust-policy=no-downgrade');
+  }, 120000);
+
+  it('should use trust policy config from package.json', async () => {
+    const projectDir = join(tempDir, 'trust-policy-config');
+    await mkdir(projectDir, { recursive: true });
+
+    await writeFile(
+      join(projectDir, 'package.json'),
+      JSON.stringify({
+        name: 'trust-policy-config-test',
+        version: '1.0.0',
+        unpm: {
+          trustPolicy: 'none',
+        },
+      })
+    );
+
+    // Run install - trust policy should be 'none' from config
+    const result = await execa('node', [cliPath, '-v', 'add', 'is-odd@3.0.1'], {
+      reject: false,
+      cwd: projectDir,
+      timeout: 120000,
     });
 
-    it('should apply trust policy by default', async () => {
-      const projectDir = join(tempDir, 'trust-policy-default');
-      await mkdir(projectDir, { recursive: true });
-
-      await writeFile(
-        join(projectDir, 'package.json'),
-        JSON.stringify({
-          name: 'trust-policy-test',
-          version: '1.0.0',
-        })
-      );
-
-      // Run with verbose to see trust policy flags
-      const result = await execa(
-        'node',
-        [cliPath, '-v', 'add', 'is-odd@3.0.1'],
-        {
-          reject: false,
-          cwd: projectDir,
-          timeout: 120000,
-        }
-      );
-
-      expect(result.exitCode).toBe(0);
-      // Trust policy should be applied by default
-      const output = result.stdout + result.stderr;
-      expect(output).toContain('trust-policy');
-    }, 120000);
-
-    it('should respect --no-trust-policy flag', async () => {
-      const projectDir = join(tempDir, 'no-trust-policy');
-      await mkdir(projectDir, { recursive: true });
-
-      await writeFile(
-        join(projectDir, 'package.json'),
-        JSON.stringify({
-          name: 'no-trust-policy-test',
-          version: '1.0.0',
-        })
-      );
-
-      // Run with --no-trust-policy
-      const result = await execa(
-        'node',
-        [cliPath, '-v', 'add', '--no-trust-policy', 'is-odd@3.0.1'],
-        {
-          reject: false,
-          cwd: projectDir,
-          timeout: 120000,
-        }
-      );
-
-      expect(result.exitCode).toBe(0);
-      // Trust policy should be disabled
-      const output = result.stdout + result.stderr;
-      // When disabled, trust-policy=no-downgrade should NOT appear
-      expect(output).not.toContain('trust-policy=no-downgrade');
-    }, 120000);
-
-    it('should use trust policy config from package.json', async () => {
-      const projectDir = join(tempDir, 'trust-policy-config');
-      await mkdir(projectDir, { recursive: true });
-
-      await writeFile(
-        join(projectDir, 'package.json'),
-        JSON.stringify({
-          name: 'trust-policy-config-test',
-          version: '1.0.0',
-          unpm: {
-            trustPolicy: 'none',
-          },
-        })
-      );
-
-      // Run install - trust policy should be 'none' from config
-      const result = await execa(
-        'node',
-        [cliPath, '-v', 'add', 'is-odd@3.0.1'],
-        {
-          reject: false,
-          cwd: projectDir,
-          timeout: 120000,
-        }
-      );
-
-      expect(result.exitCode).toBe(0);
-    }, 120000);
-  }
-);
+    expect(result.exitCode).toBe(0);
+  }, 120000);
+});
 
 describe.skipIf(!HEAVY_TESTS)(
   'Heavy Integration Tests - Provenance Command',
@@ -1876,7 +1865,9 @@ describe.skipIf(!HEAVY_TESTS)(
       expect(installResult.exitCode).toBeLessThanOrEqual(1);
 
       // Verify esbuild is installed
-      const hasEsbuild = await fileExists(join(projectDir, 'node_modules', 'esbuild'));
+      const hasEsbuild = await fileExists(
+        join(projectDir, 'node_modules', 'esbuild')
+      );
       expect(hasEsbuild).toBe(true);
 
       // Create a lockfile for strict mode validation
@@ -1901,7 +1892,9 @@ describe.skipIf(!HEAVY_TESTS)(
       // Should fail because esbuild has build scripts and is not in allowlist
       expect(result.exitCode).toBe(1);
       const output = result.stdout + result.stderr;
-      expect(output.toLowerCase()).toMatch(/unreviewed|build scripts|allowlist/);
+      expect(output.toLowerCase()).toMatch(
+        /unreviewed|build scripts|allowlist/
+      );
     }, 180000);
 
     it('should pass strict mode when build scripts are in allowlist', async () => {

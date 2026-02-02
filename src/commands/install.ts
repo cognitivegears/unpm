@@ -219,7 +219,9 @@ export async function install(
   // Extract all security config (with strict mode adjustments)
   const securityConfig = await getSecurityConfig(allArgs);
 
-  const { packages, flags } = extractPackagesFromArgs(securityConfig.cleanedArgs);
+  const { packages, flags } = extractPackagesFromArgs(
+    securityConfig.cleanedArgs
+  );
 
   // Handle script flags
   const scriptResult = await handleScriptFlags(flags, allArgs);
@@ -244,7 +246,9 @@ export async function install(
     );
   }
   if (securityConfig.trustPolicyConfig.trustPolicy !== 'none') {
-    logger.debug(`Trust policy: ${securityConfig.trustPolicyConfig.trustPolicy}`);
+    logger.debug(
+      `Trust policy: ${securityConfig.trustPolicyConfig.trustPolicy}`
+    );
   }
   if (securityConfig.exoticSubdepsConfig.enabled) {
     logger.debug('Exotic subdependencies blocking: enabled');
@@ -338,7 +342,9 @@ export async function install(
     if (auditResult !== 0 && strictConfig.blockAuditFailures) {
       logger.error('');
       logger.error(
-        chalk.red('  Strict mode: Audit found vulnerabilities. Install blocked.')
+        chalk.red(
+          '  Strict mode: Audit found vulnerabilities. Install blocked.'
+        )
       );
       logger.error('');
       if (mode.mode === 'pre-migration') {
@@ -498,7 +504,9 @@ export async function ci(
     if (auditResult !== 0 && strictConfig.blockAuditFailures) {
       logger.error('');
       logger.error(
-        chalk.red('  Strict mode: Audit found vulnerabilities. Install blocked.')
+        chalk.red(
+          '  Strict mode: Audit found vulnerabilities. Install blocked.'
+        )
       );
       logger.error('');
       if (mode.mode === 'pre-migration') {
@@ -549,7 +557,9 @@ export async function add(
   // Extract all security config (with strict mode adjustments)
   const securityConfig = await getSecurityConfig(allArgs);
 
-  const { packages, flags } = extractPackagesFromArgs(securityConfig.cleanedArgs);
+  const { packages, flags } = extractPackagesFromArgs(
+    securityConfig.cleanedArgs
+  );
 
   // Handle script flags
   const scriptResult = await handleScriptFlags(flags, allArgs);
@@ -693,7 +703,9 @@ export async function update(
     return 1;
   }
 
-  let mappedArgs = mapNpmFlagsToPnpm(removeUnpmFlags(securityConfig.cleanedArgs));
+  let mappedArgs = mapNpmFlagsToPnpm(
+    removeUnpmFlags(securityConfig.cleanedArgs)
+  );
 
   // Always add --ignore-scripts unless --force-scripts was used
   if (!scriptResult.forceScripts && !mappedArgs.includes('--ignore-scripts')) {

@@ -162,7 +162,11 @@ async function runScript(scriptName: string, cwd?: string): Promise<void> {
 /**
  * Check if a directory entry is a directory or a symlink (pnpm uses symlinks).
  */
-function isPackageEntry(entry: { isDirectory: () => boolean; isSymbolicLink: () => boolean; name: string }): boolean {
+function isPackageEntry(entry: {
+  isDirectory: () => boolean;
+  isSymbolicLink: () => boolean;
+  name: string;
+}): boolean {
   // Skip hidden files/dirs and special entries
   if (entry.name.startsWith('.')) return false;
   // Accept both directories and symlinks (pnpm uses symlinks in node_modules)

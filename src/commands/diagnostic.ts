@@ -1,6 +1,9 @@
 import chalk from 'chalk';
 import { passthroughToNpm } from './passthrough.js';
-import { runSecurityChecks, type SecurityCheckResult } from '../security/doctor.js';
+import {
+  runSecurityChecks,
+  type SecurityCheckResult,
+} from '../security/doctor.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -55,16 +58,24 @@ async function runSecurityDoctor(): Promise<number> {
   const failCount = results.filter((r) => r.status === 'fail').length;
 
   logger.info(chalk.bold('Summary'));
-  logger.info(`  ${chalk.green(`${passCount} passed`)}, ${chalk.yellow(`${warnCount} warnings`)}, ${chalk.red(`${failCount} failures`)}`);
+  logger.info(
+    `  ${chalk.green(`${passCount} passed`)}, ${chalk.yellow(`${warnCount} warnings`)}, ${chalk.red(`${failCount} failures`)}`
+  );
   logger.info('');
 
   if (hasFailures) {
-    logger.info(chalk.red('Security issues detected. Please address the failures above.'));
+    logger.info(
+      chalk.red('Security issues detected. Please address the failures above.')
+    );
     return 1;
   }
 
   if (hasWarnings) {
-    logger.info(chalk.yellow('Some security recommendations. Consider addressing the warnings above.'));
+    logger.info(
+      chalk.yellow(
+        'Some security recommendations. Consider addressing the warnings above.'
+      )
+    );
     return 0;
   }
 
@@ -83,7 +94,9 @@ function getStatusIcon(status: SecurityCheckResult['status']): string {
   }
 }
 
-function getStatusColor(status: SecurityCheckResult['status']): (text: string) => string {
+function getStatusColor(
+  status: SecurityCheckResult['status']
+): (text: string) => string {
   switch (status) {
     case 'pass':
       return chalk.green;

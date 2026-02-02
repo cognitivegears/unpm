@@ -133,7 +133,10 @@ export interface TrustPolicyFlagsResult {
 export async function extractTrustPolicyFlags(
   args: string[],
   cwd?: string
-): Promise<{ cleanedArgs: string[]; trustPolicyFlags: TrustPolicyFlagsResult }> {
+): Promise<{
+  cleanedArgs: string[];
+  trustPolicyFlags: TrustPolicyFlagsResult;
+}> {
   const config = await getTrustPolicyConfig(cwd);
 
   let trustPolicy = config.trustPolicy;

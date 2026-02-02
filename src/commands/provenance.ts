@@ -115,7 +115,9 @@ function displayProvenanceInfo(
   // Repository info
   logger.info(chalk.bold('Repository'));
   if (pkgInfo.repository) {
-    const repoUrl = pkgInfo.repository.url?.replace(/^git\+/, '').replace(/\.git$/, '');
+    const repoUrl = pkgInfo.repository.url
+      ?.replace(/^git\+/, '')
+      .replace(/\.git$/, '');
     logger.info(`  URL: ${repoUrl ?? 'Not specified'}`);
     if (pkgInfo.repository.directory) {
       logger.info(`  Directory: ${pkgInfo.repository.directory}`);
@@ -136,7 +138,9 @@ function displayProvenanceInfo(
   logger.info(chalk.bold('Maintainers'));
   if (pkgInfo.maintainers && pkgInfo.maintainers.length > 0) {
     for (const maintainer of pkgInfo.maintainers.slice(0, 5)) {
-      logger.info(`  - ${maintainer.name ?? 'Unknown'}${maintainer.email ? ` <${maintainer.email}>` : ''}`);
+      logger.info(
+        `  - ${maintainer.name ?? 'Unknown'}${maintainer.email ? ` <${maintainer.email}>` : ''}`
+      );
     }
     if (pkgInfo.maintainers.length > 5) {
       logger.info(`  ... and ${pkgInfo.maintainers.length - 5} more`);
@@ -149,7 +153,9 @@ function displayProvenanceInfo(
   // Published by
   logger.info(chalk.bold('Last Published By'));
   if (pkgInfo._npmUser) {
-    logger.info(`  ${pkgInfo._npmUser.name ?? 'Unknown'}${pkgInfo._npmUser.email ? ` <${pkgInfo._npmUser.email}>` : ''}`);
+    logger.info(
+      `  ${pkgInfo._npmUser.name ?? 'Unknown'}${pkgInfo._npmUser.email ? ` <${pkgInfo._npmUser.email}>` : ''}`
+    );
   } else {
     logger.info(chalk.yellow('  Not available'));
   }
@@ -192,7 +198,9 @@ function displayProvenanceInfo(
     }
     if (attestations.provenance?.predicateType) {
       logger.info(
-        chalk.green(`  Predicate Type: ${attestations.provenance.predicateType}`)
+        chalk.green(
+          `  Predicate Type: ${attestations.provenance.predicateType}`
+        )
       );
     }
   } else {
@@ -212,9 +220,7 @@ function displayProvenanceInfo(
     for (const sig of signatures) {
       logger.info(chalk.green(`  Key ID: ${sig.keyid ?? 'Unknown'}`));
       if (sig.sig) {
-        logger.info(
-          chalk.green(`  Signature: ${sig.sig.substring(0, 40)}...`)
-        );
+        logger.info(chalk.green(`  Signature: ${sig.sig.substring(0, 40)}...`));
       }
     }
   } else {
@@ -243,11 +249,21 @@ function displayProvenanceInfo(
   const hasRepository = !!pkgInfo.repository?.url;
 
   if (hasAttestations && hasSignatures && hasRepository) {
-    logger.info(chalk.green('  High trust: Attestations, signatures, and repository link present'));
+    logger.info(
+      chalk.green(
+        '  High trust: Attestations, signatures, and repository link present'
+      )
+    );
   } else if (hasRepository && (hasAttestations || hasSignatures)) {
-    logger.info(chalk.green('  Good trust: Repository and attestations/signatures present'));
+    logger.info(
+      chalk.green(
+        '  Good trust: Repository and attestations/signatures present'
+      )
+    );
   } else if (hasRepository) {
-    logger.info(chalk.yellow('  Moderate trust: Repository link present, no attestations'));
+    logger.info(
+      chalk.yellow('  Moderate trust: Repository link present, no attestations')
+    );
   } else {
     logger.info(chalk.red('  Low trust: No repository link or attestations'));
   }
@@ -255,7 +271,9 @@ function displayProvenanceInfo(
 }
 
 function printProvenanceHelp(): void {
-  logger.info(chalk.bold('unpm provenance - Show package attestation/provenance info'));
+  logger.info(
+    chalk.bold('unpm provenance - Show package attestation/provenance info')
+  );
   logger.info('');
   logger.info('Usage:');
   logger.info('  unpm provenance <package>');

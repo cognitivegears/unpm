@@ -160,7 +160,10 @@ describe('extractTrustPolicyFlags', () => {
   });
 
   it('should parse --no-trust-policy flag', async () => {
-    const result = await extractTrustPolicyFlags(['--no-trust-policy', 'lodash']);
+    const result = await extractTrustPolicyFlags([
+      '--no-trust-policy',
+      'lodash',
+    ]);
 
     expect(result.cleanedArgs).toEqual(['lodash']);
     expect(result.trustPolicyFlags.disabled).toBe(true);

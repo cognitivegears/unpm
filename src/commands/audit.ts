@@ -64,7 +64,9 @@ export async function runPostInstallAudit(
 /**
  * Check if post-install audit should run based on config.
  */
-export async function shouldRunPostInstallAudit(cwd?: string): Promise<boolean> {
+export async function shouldRunPostInstallAudit(
+  cwd?: string
+): Promise<boolean> {
   const config = await getUnpmConfig(cwd);
   return config.auditAfterInstall === true;
 }
