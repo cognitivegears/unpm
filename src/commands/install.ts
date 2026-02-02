@@ -9,12 +9,21 @@ import {
   runLocalScripts,
   runAllowedPackageScripts,
   getSecurityFlags,
+  getUnreviewedBuildScripts,
 } from '../security/script-policy.js';
 import {
   extractReleaseAgeFlags,
   formatDuration,
   type ReleaseAgeFlagsResult,
 } from '../security/release-age.js';
+import {
+  extractTrustPolicyFlags,
+  type TrustPolicyFlagsResult,
+} from '../security/trust-policy.js';
+import {
+  extractExoticSubdepsFlags,
+  type ExoticSubdepsFlagsResult,
+} from '../security/exotic-subdeps.js';
 import {
   isStrictMode,
   getStrictModeConfig,
@@ -30,6 +39,11 @@ import {
   getCompatibilityFlags,
 } from '../security/lockfile-sync.js';
 import { logger } from '../utils/logger.js';
+import {
+  runPostInstallAudit,
+  shouldRunPostInstallAudit,
+  getConfiguredAuditLevel,
+} from './audit.js';
 
 /**
  * Check for deprecated script bypass flags and handle --force-scripts.
@@ -110,15 +124,24 @@ function removeUnpmFlags(args: string[]): string[] {
   );
 }
 
+interface SecurityConfig {
+  releaseAgeConfig: ReleaseAgeFlagsResult;
+  trustPolicyConfig: TrustPolicyFlagsResult;
+  exoticSubdepsConfig: ExoticSubdepsFlagsResult;
+  cleanedArgs: string[];
+}
+
 /**
- * Get release age settings, potentially adjusted for strict mode.
- * Returns CLI flags to pass to pnpm for minimum-release-age setting.
+ * Get all security settings, potentially adjusted for strict mode.
+ * Returns CLI flags to pass to pnpm for various security settings.
  */
-async function getEffectiveReleaseAgeConfig(
+async function getSecurityConfig(
   args: string[],
   cwd?: string
-): Promise<{ cleanedArgs: string[]; releaseAgeConfig: ReleaseAgeFlagsResult }> {
+): Promise<SecurityConfig> {
   const strictConfig = await getStrictModeConfig(args, cwd);
+
+  // Extract release age config
   let { cleanedArgs, releaseAgeFlags } = await extractReleaseAgeFlags(
     args,
     cwd
@@ -143,7 +166,20 @@ async function getEffectiveReleaseAgeConfig(
     }
   }
 
-  return { cleanedArgs, releaseAgeConfig: releaseAgeFlags };
+  // Extract trust policy config
+  const trustPolicyResult = await extractTrustPolicyFlags(cleanedArgs, cwd);
+  cleanedArgs = trustPolicyResult.cleanedArgs;
+
+  // Extract exotic subdeps config
+  const exoticSubdepsResult = await extractExoticSubdepsFlags(cleanedArgs, cwd);
+  cleanedArgs = exoticSubdepsResult.cleanedArgs;
+
+  return {
+    releaseAgeConfig: releaseAgeFlags,
+    trustPolicyConfig: trustPolicyResult.trustPolicyFlags,
+    exoticSubdepsConfig: exoticSubdepsResult.exoticSubdepsFlags,
+    cleanedArgs,
+  };
 }
 
 /**
@@ -180,11 +216,12 @@ export async function install(
     return 1;
   }
 
-  // Extract release age config (with strict mode adjustments)
-  const { cleanedArgs, releaseAgeConfig } =
-    await getEffectiveReleaseAgeConfig(allArgs);
+  // Extract all security config (with strict mode adjustments)
+  const securityConfig = await getSecurityConfig(allArgs);
 
-  const { packages, flags } = extractPackagesFromArgs(cleanedArgs);
+  const { packages, flags } = extractPackagesFromArgs(
+    securityConfig.cleanedArgs
+  );
 
   // Handle script flags
   const scriptResult = await handleScriptFlags(flags, allArgs);
@@ -203,10 +240,18 @@ export async function install(
   }
 
   // Log security info
-  if (releaseAgeConfig.minAgeMinutes > 0) {
+  if (securityConfig.releaseAgeConfig.minAgeMinutes > 0) {
     logger.debug(
-      `Minimum release age: ${formatDuration(releaseAgeConfig.minAgeMinutes)}`
+      `Minimum release age: ${formatDuration(securityConfig.releaseAgeConfig.minAgeMinutes)}`
     );
+  }
+  if (securityConfig.trustPolicyConfig.trustPolicy !== 'none') {
+    logger.debug(
+      `Trust policy: ${securityConfig.trustPolicyConfig.trustPolicy}`
+    );
+  }
+  if (securityConfig.exoticSubdepsConfig.enabled) {
+    logger.debug('Exotic subdependencies blocking: enabled');
   }
 
   // Run preinstall scripts from local package.json
@@ -222,12 +267,14 @@ export async function install(
     }
   }
 
-  // Run pnpm install with release age flags and compatibility flags
+  // Run pnpm install with security flags and compatibility flags
   const pnpmArgs = [
     'install',
     ...packages,
     ...removeStrictFlag(mappedFlags),
-    ...releaseAgeConfig.flags,
+    ...securityConfig.releaseAgeConfig.flags,
+    ...securityConfig.trustPolicyConfig.flags,
+    ...securityConfig.exoticSubdepsConfig.flags,
     ...getCompatibilityFlags(mode),
   ];
   const result = await spawnPnpm(pnpmArgs);
@@ -249,6 +296,57 @@ export async function install(
       await runLocalScripts('postinstall');
     } catch (error) {
       logger.error(`Postinstall script failed: ${error}`);
+      if (mode.mode === 'pre-migration') {
+        await cleanupTempLockfile();
+      }
+      return 1;
+    }
+  }
+
+  // Check for unreviewed build scripts in strict mode
+  const strictConfig = await getStrictModeConfig(allArgs);
+  if (strictConfig.strictDepBuilds) {
+    const unreviewedPackages = await getUnreviewedBuildScripts();
+    if (unreviewedPackages.length > 0) {
+      logger.error('');
+      logger.error(
+        chalk.red(
+          `  Strict mode: ${unreviewedPackages.length} package(s) have unreviewed build scripts:`
+        )
+      );
+      for (const pkg of unreviewedPackages.slice(0, 10)) {
+        logger.error(chalk.red(`    - ${pkg}`));
+      }
+      if (unreviewedPackages.length > 10) {
+        logger.error(
+          chalk.red(`    ... and ${unreviewedPackages.length - 10} more`)
+        );
+      }
+      logger.error('');
+      logger.error('  To allow these scripts, run:');
+      logger.error(chalk.cyan('    unpm allow-scripts add <package-name>'));
+      logger.error('');
+      if (mode.mode === 'pre-migration') {
+        await cleanupTempLockfile();
+      }
+      return 1;
+    }
+  }
+
+  // Run post-install audit if enabled
+  if (await shouldRunPostInstallAudit()) {
+    const auditLevel = strictConfig.enabled
+      ? strictConfig.auditLevel
+      : await getConfiguredAuditLevel();
+    const auditResult = await runPostInstallAudit(auditLevel);
+    if (auditResult !== 0 && strictConfig.blockAuditFailures) {
+      logger.error('');
+      logger.error(
+        chalk.red(
+          '  Strict mode: Audit found vulnerabilities. Install blocked.'
+        )
+      );
+      logger.error('');
       if (mode.mode === 'pre-migration') {
         await cleanupTempLockfile();
       }
@@ -296,12 +394,11 @@ export async function ci(
     return 1;
   }
 
-  // Extract release age config (with strict mode adjustments)
-  const { cleanedArgs, releaseAgeConfig } =
-    await getEffectiveReleaseAgeConfig(allArgs);
+  // Extract all security config (with strict mode adjustments)
+  const securityConfig = await getSecurityConfig(allArgs);
 
   // Handle script flags
-  const { flags } = extractPackagesFromArgs(cleanedArgs);
+  const { flags } = extractPackagesFromArgs(securityConfig.cleanedArgs);
   const scriptResult = await handleScriptFlags(flags, allArgs);
   if (!scriptResult.allowed) {
     if (mode.mode === 'pre-migration') {
@@ -310,7 +407,7 @@ export async function ci(
     return 1;
   }
 
-  let mappedArgs = mapNpmCiToPnpm(removeUnpmFlags(cleanedArgs));
+  let mappedArgs = mapNpmCiToPnpm(removeUnpmFlags(securityConfig.cleanedArgs));
 
   // Always add --ignore-scripts unless --force-scripts was used
   if (!scriptResult.forceScripts && !mappedArgs.includes('--ignore-scripts')) {
@@ -336,11 +433,13 @@ export async function ci(
     }
   }
 
-  // Run pnpm install with frozen lockfile, release age flags, and compatibility flags
+  // Run pnpm install with frozen lockfile, security flags, and compatibility flags
   const pnpmArgs = [
     'install',
     ...removeStrictFlag(mappedArgs),
-    ...releaseAgeConfig.flags,
+    ...securityConfig.releaseAgeConfig.flags,
+    ...securityConfig.trustPolicyConfig.flags,
+    ...securityConfig.exoticSubdepsConfig.flags,
     ...getCompatibilityFlags(mode),
   ];
   const result = await spawnPnpm(pnpmArgs);
@@ -359,6 +458,57 @@ export async function ci(
       await runLocalScripts('postinstall');
     } catch (error) {
       logger.error(`Postinstall script failed: ${error}`);
+      if (mode.mode === 'pre-migration') {
+        await cleanupTempLockfile();
+      }
+      return 1;
+    }
+  }
+
+  // Check for unreviewed build scripts in strict mode
+  const strictConfig = await getStrictModeConfig(allArgs);
+  if (strictConfig.strictDepBuilds) {
+    const unreviewedPackages = await getUnreviewedBuildScripts();
+    if (unreviewedPackages.length > 0) {
+      logger.error('');
+      logger.error(
+        chalk.red(
+          `  Strict mode: ${unreviewedPackages.length} package(s) have unreviewed build scripts:`
+        )
+      );
+      for (const pkg of unreviewedPackages.slice(0, 10)) {
+        logger.error(chalk.red(`    - ${pkg}`));
+      }
+      if (unreviewedPackages.length > 10) {
+        logger.error(
+          chalk.red(`    ... and ${unreviewedPackages.length - 10} more`)
+        );
+      }
+      logger.error('');
+      logger.error('  To allow these scripts, run:');
+      logger.error(chalk.cyan('    unpm allow-scripts add <package-name>'));
+      logger.error('');
+      if (mode.mode === 'pre-migration') {
+        await cleanupTempLockfile();
+      }
+      return 1;
+    }
+  }
+
+  // Run post-install audit if enabled
+  if (await shouldRunPostInstallAudit()) {
+    const auditLevel = strictConfig.enabled
+      ? strictConfig.auditLevel
+      : await getConfiguredAuditLevel();
+    const auditResult = await runPostInstallAudit(auditLevel);
+    if (auditResult !== 0 && strictConfig.blockAuditFailures) {
+      logger.error('');
+      logger.error(
+        chalk.red(
+          '  Strict mode: Audit found vulnerabilities. Install blocked.'
+        )
+      );
+      logger.error('');
       if (mode.mode === 'pre-migration') {
         await cleanupTempLockfile();
       }
@@ -404,11 +554,12 @@ export async function add(
     return 1;
   }
 
-  // Extract release age config (with strict mode adjustments)
-  const { cleanedArgs, releaseAgeConfig } =
-    await getEffectiveReleaseAgeConfig(allArgs);
+  // Extract all security config (with strict mode adjustments)
+  const securityConfig = await getSecurityConfig(allArgs);
 
-  const { packages, flags } = extractPackagesFromArgs(cleanedArgs);
+  const { packages, flags } = extractPackagesFromArgs(
+    securityConfig.cleanedArgs
+  );
 
   // Handle script flags
   const scriptResult = await handleScriptFlags(flags, allArgs);
@@ -426,12 +577,14 @@ export async function add(
     mappedFlags = [...getSecurityFlags(), ...mappedFlags];
   }
 
-  // Run pnpm add with release age flags and compatibility flags
+  // Run pnpm add with security flags and compatibility flags
   const pnpmArgs = [
     'add',
     ...packages,
     ...removeStrictFlag(mappedFlags),
-    ...releaseAgeConfig.flags,
+    ...securityConfig.releaseAgeConfig.flags,
+    ...securityConfig.trustPolicyConfig.flags,
+    ...securityConfig.exoticSubdepsConfig.flags,
     ...getCompatibilityFlags(mode),
   ];
   const result = await spawnPnpm(pnpmArgs);
@@ -537,12 +690,11 @@ export async function update(
     return 1;
   }
 
-  // Extract release age config (with strict mode adjustments)
-  const { cleanedArgs, releaseAgeConfig } =
-    await getEffectiveReleaseAgeConfig(allArgs);
+  // Extract all security config (with strict mode adjustments)
+  const securityConfig = await getSecurityConfig(allArgs);
 
   // Handle script flags
-  const { flags } = extractPackagesFromArgs(cleanedArgs);
+  const { flags } = extractPackagesFromArgs(securityConfig.cleanedArgs);
   const scriptResult = await handleScriptFlags(flags, allArgs);
   if (!scriptResult.allowed) {
     if (mode.mode === 'pre-migration') {
@@ -551,18 +703,22 @@ export async function update(
     return 1;
   }
 
-  let mappedArgs = mapNpmFlagsToPnpm(removeUnpmFlags(cleanedArgs));
+  let mappedArgs = mapNpmFlagsToPnpm(
+    removeUnpmFlags(securityConfig.cleanedArgs)
+  );
 
   // Always add --ignore-scripts unless --force-scripts was used
   if (!scriptResult.forceScripts && !mappedArgs.includes('--ignore-scripts')) {
     mappedArgs = [...getSecurityFlags(), ...mappedArgs];
   }
 
-  // Run pnpm update with release age flags and compatibility flags
+  // Run pnpm update with security flags and compatibility flags
   const pnpmArgs = [
     'update',
     ...removeStrictFlag(mappedArgs),
-    ...releaseAgeConfig.flags,
+    ...securityConfig.releaseAgeConfig.flags,
+    ...securityConfig.trustPolicyConfig.flags,
+    ...securityConfig.exoticSubdepsConfig.flags,
     ...getCompatibilityFlags(mode),
   ];
   const result = await spawnPnpm(pnpmArgs);

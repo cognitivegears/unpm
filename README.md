@@ -8,7 +8,9 @@ npm's default behavior allows packages to execute arbitrary scripts during insta
 
 - **Scripts blocked by default** - Dependency install scripts are blocked unless explicitly allowed
 - **Minimum release age** - New packages must be at least 2 days old before installation
+- **Trust policy** - Prevents version downgrades that could introduce malicious code
 - **Strict mode for CI** - Enhanced protections for automated environments
+- **Package provenance** - Verify supply chain integrity with attestation checks
 - **Gradual migration** - Use npm and unpm interchangeably before committing to full migration
 - **Zero migration required** - Same commands, same flags, drop-in replacement
 
@@ -55,6 +57,24 @@ Packages must be at least 2 days old, protecting against malicious packages bein
 unpm install --allow-recent=hotfix hotfix
 ```
 
+### Trust Policy
+
+Prevents version downgrades that could introduce malicious code:
+
+```bash
+unpm install                    # Trust policy enabled by default
+unpm install --no-trust-policy  # Disable if needed
+```
+
+### Package Provenance
+
+Verify supply chain integrity before installing:
+
+```bash
+unpm provenance lodash          # Check attestations and signatures
+unpm prov react@18.2.0          # Alias with version
+```
+
 ### Strict Mode
 
 For CI/CD, enable strict mode for maximum security:
@@ -65,7 +85,7 @@ UNPM_STRICT=true unpm ci
 unpm --strict ci
 ```
 
-Strict mode enforces 7-day release age, blocks `dlx`, and requires frozen lockfiles.
+Strict mode enforces 7-day release age, blocks `dlx`, requires frozen lockfiles, and fails on unreviewed build scripts.
 
 ### Gradual Migration
 
@@ -85,6 +105,16 @@ unpm migrate
 ```
 
 After migration, npm install/update is blocked to ensure consistent, secure dependency management.
+
+### Security Diagnostics
+
+Check your project's security configuration:
+
+```bash
+unpm doctor --security
+```
+
+Reviews trust policy, release age settings, lockfile status, allowlist entries, and more.
 
 ## Documentation
 

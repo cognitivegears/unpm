@@ -16,6 +16,7 @@ export async function migrate(args: string[]): Promise<number> {
   const cwd = process.cwd();
   const dryRun = args.includes('--dry-run');
   const skipLavamoat = args.includes('--skip-lavamoat');
+  const blockExoticSubdeps = args.includes('--block-exotic-subdeps');
 
   logger.info(chalk.bold('UNPM Migration'));
   logger.info('');
@@ -112,6 +113,7 @@ export async function migrate(args: string[]): Promise<number> {
       allowLocalScripts: existingUnpm?.['allowLocalScripts'] ?? true,
       allowDependencyScripts: existingUnpm?.['allowDependencyScripts'] ?? false,
       lavamoatEnabled: existingUnpm?.['lavamoatEnabled'] ?? true,
+      ...(blockExoticSubdeps ? { blockExoticSubdeps: true } : {}),
     };
     await writePackageJson(packageJson, cwd);
     logger.success('Added unpm configuration (migrated: true)');
@@ -280,10 +282,16 @@ engine-strict=true
   if (!hasPnpmrc) {
     logger.info('Creating .pnpmrc with secure defaults...');
     if (!dryRun) {
-      const pnpmrcContent = `# UNPM security defaults
+      let pnpmrcContent = `# UNPM security defaults
 ignore-scripts=true
 minimum-release-age=2d
+trust-policy=no-downgrade
+trust-policy-ignore-after=525600
 `;
+      if (blockExoticSubdeps) {
+        pnpmrcContent += `block-exotic-subdeps=true
+`;
+      }
       await writeFile(pnpmrcPath, pnpmrcContent, 'utf-8');
       logger.success('Created .pnpmrc with secure defaults');
     } else {
@@ -313,6 +321,9 @@ minimum-release-age=2d
   }
   if (!hasPnpmrc) {
     logger.info('  - .pnpmrc created with secure defaults');
+    if (blockExoticSubdeps) {
+      logger.info('  - block-exotic-subdeps enabled in .pnpmrc');
+    }
   }
   logger.info('');
   logger.info('Next steps:');

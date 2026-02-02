@@ -14,9 +14,18 @@ Add configuration to your `package.json`:
     "lavamoatEnabled": true,
     "minReleaseAge": "2d",
     "minReleaseAgeExclude": ["trusted-package"],
+    "trustPolicy": "no-downgrade",
+    "trustPolicyIgnoreAfter": "1y",
+    "trustPolicyExclude": ["internal-pkg"],
+    "blockExoticSubdeps": false,
+    "auditAfterInstall": false,
+    "auditLevel": "high",
     "strict": {
       "enabled": false,
-      "minReleaseAgeDays": 7
+      "minReleaseAgeDays": 7,
+      "strictDepBuilds": true,
+      "blockAuditFailures": true,
+      "auditLevel": "high"
     }
   },
   "lavamoat": {
@@ -36,8 +45,17 @@ Add configuration to your `package.json`:
 | `lavamoatEnabled` | `true` | Use LavaMoat allowlist for script control |
 | `minReleaseAge` | `"2d"` | Minimum age for packages (e.g., `"2d"`, `"4h"`, `"30m"`) |
 | `minReleaseAgeExclude` | `[]` | Packages exempt from minimum release age |
+| `trustPolicy` | `"no-downgrade"` | Trust policy: `"no-downgrade"` or `"none"` |
+| `trustPolicyIgnoreAfter` | `"1y"` | Ignore packages unchanged for longer than this |
+| `trustPolicyExclude` | `[]` | Packages exempt from trust policy |
+| `blockExoticSubdeps` | `false` | Block git/tarball subdependencies |
+| `auditAfterInstall` | `false` | Run security audit after install |
+| `auditLevel` | `"high"` | Audit level: `"low"`, `"moderate"`, `"high"`, `"critical"` |
 | `strict.enabled` | `false` | Enable strict security mode |
 | `strict.minReleaseAgeDays` | `7` | Minimum release age in strict mode (days) |
+| `strict.strictDepBuilds` | `true` | Fail if unreviewed build scripts in strict mode |
+| `strict.blockAuditFailures` | `true` | Fail install on audit failures in strict mode |
+| `strict.auditLevel` | `"high"` | Audit level for strict mode |
 
 ## Environment Variables
 
@@ -71,7 +89,7 @@ unpm allow-scripts list
 
 ## Duration Formats
 
-For `minReleaseAge` and `--min-release-age` flag:
+For `minReleaseAge`, `trustPolicyIgnoreAfter`, and related flags:
 
 | Format | Example | Description |
 |--------|---------|-------------|
@@ -79,3 +97,4 @@ For `minReleaseAge` and `--min-release-age` flag:
 | `h`, `hr`, `hours` | `4h` | Hours |
 | `d`, `days` | `2d` | Days |
 | `w`, `weeks` | `1w` | Weeks |
+| `y`, `years` | `1y` | Years |

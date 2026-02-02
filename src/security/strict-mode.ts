@@ -17,6 +17,12 @@ export interface StrictModeConfig {
   requireFrozenLockfile: boolean;
   /** Block explore command entirely */
   blockExplore: boolean;
+  /** Fail if unreviewed build scripts are detected */
+  strictDepBuilds: boolean;
+  /** Fail install on audit failures */
+  blockAuditFailures: boolean;
+  /** Audit level for post-install audit (default: 'high' in strict mode) */
+  auditLevel: 'low' | 'moderate' | 'high' | 'critical';
 }
 
 /**
@@ -29,6 +35,9 @@ const STRICT_MODE_DEFAULTS: StrictModeConfig = {
   blockForceScripts: true,
   requireFrozenLockfile: true,
   blockExplore: true,
+  strictDepBuilds: true,
+  blockAuditFailures: true,
+  auditLevel: 'high',
 };
 
 /**
@@ -41,6 +50,9 @@ const NORMAL_MODE_DEFAULTS: StrictModeConfig = {
   blockForceScripts: false,
   requireFrozenLockfile: false,
   blockExplore: false,
+  strictDepBuilds: false,
+  blockAuditFailures: false,
+  auditLevel: 'high',
 };
 
 /**
@@ -138,6 +150,15 @@ export async function getStrictModeConfig(
     }
     if (unpmConfig.strict.blockExplore !== undefined) {
       config.blockExplore = unpmConfig.strict.blockExplore;
+    }
+    if (unpmConfig.strict.strictDepBuilds !== undefined) {
+      config.strictDepBuilds = unpmConfig.strict.strictDepBuilds;
+    }
+    if (unpmConfig.strict.blockAuditFailures !== undefined) {
+      config.blockAuditFailures = unpmConfig.strict.blockAuditFailures;
+    }
+    if (unpmConfig.strict.auditLevel !== undefined) {
+      config.auditLevel = unpmConfig.strict.auditLevel;
     }
   }
 

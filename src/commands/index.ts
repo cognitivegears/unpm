@@ -15,3 +15,4 @@ export * from './diagnostic.js';
 export * from './org-team.js';
 export * from './package.js';
 export * from './unused.js';
+export * from './provenance.js';

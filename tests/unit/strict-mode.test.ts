@@ -122,6 +122,9 @@ describe('getStrictModeConfig', () => {
     expect(config.blockForceScripts).toBe(false);
     expect(config.requireFrozenLockfile).toBe(false);
     expect(config.blockExplore).toBe(false);
+    expect(config.strictDepBuilds).toBe(false);
+    expect(config.blockAuditFailures).toBe(false);
+    expect(config.auditLevel).toBe('high');
   });
 
   it('should return strict mode defaults when enabled via flag', async () => {
@@ -134,6 +137,9 @@ describe('getStrictModeConfig', () => {
     expect(config.blockForceScripts).toBe(true);
     expect(config.requireFrozenLockfile).toBe(true);
     expect(config.blockExplore).toBe(true);
+    expect(config.strictDepBuilds).toBe(true);
+    expect(config.blockAuditFailures).toBe(true);
+    expect(config.auditLevel).toBe('high');
   });
 
   it('should allow overriding strict mode settings in package.json', async () => {
@@ -153,6 +159,26 @@ describe('getStrictModeConfig', () => {
     expect(config.minReleaseAgeDays).toBe(14);
     expect(config.blockDlx).toBe(false);
     expect(config.blockForceScripts).toBe(true); // Still default
+  });
+
+  it('should allow overriding new strict mode fields in package.json', async () => {
+    vi.mocked(configModule.readPackageJson).mockResolvedValue({
+      name: 'test',
+      unpm: {
+        strict: {
+          enabled: true,
+          strictDepBuilds: false,
+          blockAuditFailures: false,
+          auditLevel: 'critical',
+        },
+      },
+    });
+    const config = await getStrictModeConfig([]);
+
+    expect(config.enabled).toBe(true);
+    expect(config.strictDepBuilds).toBe(false);
+    expect(config.blockAuditFailures).toBe(false);
+    expect(config.auditLevel).toBe('critical');
   });
 });
 

@@ -160,6 +160,20 @@ async function runScript(scriptName: string, cwd?: string): Promise<void> {
 }
 
 /**
+ * Check if a directory entry is a directory or a symlink (pnpm uses symlinks).
+ */
+function isPackageEntry(entry: {
+  isDirectory: () => boolean;
+  isSymbolicLink: () => boolean;
+  name: string;
+}): boolean {
+  // Skip hidden files/dirs and special entries
+  if (entry.name.startsWith('.')) return false;
+  // Accept both directories and symlinks (pnpm uses symlinks in node_modules)
+  return entry.isDirectory() || entry.isSymbolicLink();
+}
+
+/**
  * Scan node_modules for packages that have install scripts.
  */
 export async function getPackagesWithScripts(cwd?: string): Promise<string[]> {
@@ -176,7 +190,7 @@ export async function getPackagesWithScripts(cwd?: string): Promise<string[]> {
     const entries = await readdir(nodeModulesPath, { withFileTypes: true });
 
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
+      if (!isPackageEntry(entry)) continue;
 
       // Handle scoped packages (@org/package)
       if (entry.name.startsWith('@')) {
@@ -184,7 +198,7 @@ export async function getPackagesWithScripts(cwd?: string): Promise<string[]> {
         const scopedEntries = await readdir(scopePath, { withFileTypes: true });
 
         for (const scopedEntry of scopedEntries) {
-          if (!scopedEntry.isDirectory()) continue;
+          if (!isPackageEntry(scopedEntry)) continue;
           const pkgName = `${entry.name}/${scopedEntry.name}`;
           if (
             await packageHasInstallScripts(join(scopePath, scopedEntry.name))
@@ -286,4 +300,24 @@ export async function runAllowedPackageScripts(cwd?: string): Promise<void> {
  */
 export function getSecurityFlags(): string[] {
   return ['--ignore-scripts'];
+}
+
+/**
+ * Get list of packages with install scripts that are NOT in the allowlist.
+ * Used by strict mode to fail if unreviewed build scripts are detected.
+ */
+export async function getUnreviewedBuildScripts(
+  cwd?: string
+): Promise<string[]> {
+  const packagesWithScripts = await getPackagesWithScripts(cwd);
+  const unreviewedPackages: string[] = [];
+
+  for (const packageName of packagesWithScripts) {
+    const allowed = await isPackageAllowedToRunScripts(packageName, cwd);
+    if (!allowed) {
+      unreviewedPackages.push(packageName);
+    }
+  }
+
+  return unreviewedPackages;
 }

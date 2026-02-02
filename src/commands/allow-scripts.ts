@@ -6,6 +6,7 @@ import {
   initializeLavamoatConfig,
   hasLavamoatConfig,
 } from '../security/lavamoat.js';
+import { getPackagesWithScripts } from '../security/script-policy.js';
 import { logger } from '../utils/logger.js';
 
 export async function allowScripts(args: string[]): Promise<number> {
@@ -23,6 +24,8 @@ export async function allowScripts(args: string[]): Promise<number> {
       return allowScriptsList();
     case 'init':
       return allowScriptsInit();
+    case 'review':
+      return allowScriptsReview();
     default:
       printAllowScriptsHelp();
       return subcommand ? 1 : 0;
@@ -112,6 +115,93 @@ async function allowScriptsInit(): Promise<number> {
   }
 }
 
+async function allowScriptsReview(): Promise<number> {
+  const packagesWithScripts = await getPackagesWithScripts();
+  const allowedPackages = await listAllowlist();
+
+  // Categorize packages
+  const allowed: string[] = [];
+  const blocked: string[] = [];
+
+  for (const pkg of packagesWithScripts) {
+    if (allowedPackages.includes(pkg)) {
+      allowed.push(pkg);
+    } else {
+      blocked.push(pkg);
+    }
+  }
+
+  // Find stale entries (in allowlist but not installed or no scripts)
+  const stale = allowedPackages.filter(
+    (pkg) => !packagesWithScripts.includes(pkg)
+  );
+
+  logger.info(chalk.bold('Script Allowlist Review'));
+  logger.info('');
+
+  // Allowed packages
+  logger.info(chalk.green.bold(`Allowed (${allowed.length})`));
+  if (allowed.length === 0) {
+    logger.info(chalk.dim('  No packages with scripts are allowed'));
+  } else {
+    for (const pkg of allowed) {
+      logger.info(chalk.green(`  \u2713 ${pkg}`));
+    }
+  }
+  logger.info('');
+
+  // Blocked packages
+  logger.info(chalk.red.bold(`Blocked (${blocked.length})`));
+  if (blocked.length === 0) {
+    logger.info(chalk.dim('  No packages with scripts are blocked'));
+  } else {
+    for (const pkg of blocked.slice(0, 20)) {
+      logger.info(chalk.red(`  \u2717 ${pkg}`));
+    }
+    if (blocked.length > 20) {
+      logger.info(chalk.red(`  ... and ${blocked.length - 20} more`));
+    }
+  }
+  logger.info('');
+
+  // Stale entries
+  if (stale.length > 0) {
+    logger.info(chalk.yellow.bold(`Stale Entries (${stale.length})`));
+    logger.info(chalk.dim('  In allowlist but not installed or no scripts:'));
+    for (const pkg of stale) {
+      logger.info(chalk.yellow(`  ? ${pkg}`));
+    }
+    logger.info('');
+  }
+
+  // Summary and suggestions
+  logger.info(chalk.bold('Summary'));
+  logger.info(
+    `  ${chalk.green(`${allowed.length} allowed`)}, ${chalk.red(`${blocked.length} blocked`)}, ${chalk.yellow(`${stale.length} stale`)}`
+  );
+  logger.info('');
+
+  if (blocked.length > 0) {
+    logger.info(chalk.bold('Suggestions'));
+    logger.info('  To allow a blocked package:');
+    logger.info(chalk.cyan('    unpm allow-scripts add <package-name>'));
+    logger.info('');
+  }
+
+  if (stale.length > 0) {
+    logger.info('  To remove stale entries:');
+    for (const pkg of stale.slice(0, 3)) {
+      logger.info(chalk.cyan(`    unpm allow-scripts remove ${pkg}`));
+    }
+    if (stale.length > 3) {
+      logger.info(chalk.dim(`    ... and ${stale.length - 3} more`));
+    }
+    logger.info('');
+  }
+
+  return 0;
+}
+
 function printAllowScriptsHelp(): void {
   logger.info(
     chalk.bold('unpm allow-scripts - Manage LavaMoat script allowlist')
@@ -124,6 +214,9 @@ function printAllowScriptsHelp(): void {
   logger.info('  add <pkg>     Add package(s) to the allowlist');
   logger.info('  remove <pkg>  Remove package(s) from the allowlist');
   logger.info('  list          List all allowed packages');
+  logger.info(
+    '  review        Review all packages with scripts (allowed/blocked/stale)'
+  );
   logger.info('  init          Initialize LavaMoat configuration');
   logger.info('');
   logger.info('Examples:');
@@ -131,4 +224,5 @@ function printAllowScriptsHelp(): void {
   logger.info('  unpm allow-scripts add node-sass sharp');
   logger.info('  unpm allow-scripts remove esbuild');
   logger.info('  unpm allow-scripts list');
+  logger.info('  unpm allow-scripts review');
 }

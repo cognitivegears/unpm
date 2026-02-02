@@ -79,6 +79,13 @@ const flagsWithValues = new Set([
   '--workspace',
   '-C',
   '-w',
+  // UNPM-specific flags with values
+  '--trust-policy',
+  '--trust-policy-ignore-after',
+  '--trust-policy-exclude',
+  '--min-release-age',
+  '--minimum-release-age',
+  '--allow-recent',
 ]);
 
 /**
@@ -95,6 +102,17 @@ export const unpmOnlyFlags = new Set([
   '--no-min-release-age',
   '--no-minimum-release-age',
   '--allow-recent',
+  // Trust policy flags
+  '--trust-policy',
+  '--trust-policy-ignore-after',
+  '--trust-policy-exclude',
+  '--no-trust-policy',
+  // Exotic subdeps flag
+  '--block-exotic-subdeps',
+  '--no-block-exotic-subdeps',
+  // Audit flags
+  '--audit-after-install',
+  '--no-audit-after-install',
 ]);
 
 /**
