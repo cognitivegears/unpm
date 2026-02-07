@@ -204,6 +204,19 @@ describe('extractPackagesFromArgs', () => {
       '@myorg',
     ]);
   });
+
+  it('should keep upstream override values with flags', () => {
+    const result = extractPackagesFromArgs([
+      '--upstream-npm',
+      'https://registry.npmjs.org',
+      'lodash',
+    ]);
+    expect(result.packages).toEqual(['lodash']);
+    expect(result.flags).toEqual([
+      '--upstream-npm',
+      'https://registry.npmjs.org',
+    ]);
+  });
 });
 
 describe('hasFlag', () => {
@@ -331,6 +344,20 @@ describe('isUnpmOnlyFlag', () => {
     expect(isUnpmOnlyFlag('--force-scripts')).toBe(true);
   });
 
+  it('should return true for --depgate', () => {
+    expect(isUnpmOnlyFlag('--depgate')).toBe(true);
+  });
+
+  it('should return true for --depgate-config with value', () => {
+    expect(isUnpmOnlyFlag('--depgate-config=./policy.yml')).toBe(true);
+  });
+
+  it('should return true for upstream override flags', () => {
+    expect(isUnpmOnlyFlag('--upstream-npm=https://registry.npmjs.org')).toBe(
+      true
+    );
+  });
+
   it('should return true for --min-release-age with value', () => {
     expect(isUnpmOnlyFlag('--min-release-age=2d')).toBe(true);
   });
@@ -363,6 +390,26 @@ describe('removeUnpmOnlyFlags', () => {
 
   it('should remove --force-scripts flag', () => {
     const result = removeUnpmOnlyFlags(['--force-scripts', '--save-dev']);
+    expect(result).toEqual(['--save-dev']);
+  });
+
+  it('should remove depgate flags and values', () => {
+    const result = removeUnpmOnlyFlags([
+      '--depgate',
+      '--depgate-config',
+      './policy.yml',
+      '--depgate-decision-mode=warn',
+      'package',
+    ]);
+    expect(result).toEqual(['package']);
+  });
+
+  it('should remove upstream override flags and values', () => {
+    const result = removeUnpmOnlyFlags([
+      '--upstream-npm',
+      'https://registry.npmjs.org',
+      '--save-dev',
+    ]);
     expect(result).toEqual(['--save-dev']);
   });
 

@@ -10,6 +10,7 @@ npm's default behavior allows packages to execute arbitrary scripts during insta
 - **Minimum release age** - New packages must be at least 2 days old before installation
 - **Trust policy** - Prevents version downgrades that could introduce malicious code
 - **Strict mode for CI** - Enhanced protections for automated environments
+- **DepGate proxy mode** - Route install traffic through a short-lived policy proxy
 - **Package provenance** - Verify supply chain integrity with attestation checks
 - **Gradual migration** - Use npm and unpm interchangeably before committing to full migration
 - **Zero migration required** - Same commands, same flags, drop-in replacement
@@ -30,6 +31,7 @@ Replace `npm` with `unpm`:
 
 ```bash
 unpm install              # Install dependencies
+unpm --depgate install    # Optional: route install through DepGate proxy
 unpm add lodash           # Add a package
 unpm run build            # Run scripts
 unpm test                 # Run tests
@@ -87,6 +89,29 @@ unpm --strict ci
 
 Strict mode enforces 7-day release age, blocks `dlx`, requires frozen lockfiles, and fails on unreviewed build scripts.
 
+### DepGate Ephemeral Proxy
+
+UNPM can run install commands through DepGate without writing persistent registry config:
+
+```bash
+unpm --depgate install
+```
+
+Optional DepGate settings:
+
+```bash
+unpm --depgate --depgate-config ./depgate-policy.yml --depgate-decision-mode warn install
+```
+
+This mode requires a DepGate build that supports:
+
+```bash
+depgate run --prepare --manager <manager> --log-level WARNING
+```
+
+If you need it before a release including prepare mode, use the wrappers branch:
+[cognitivegears/depgate `feature/wrappers`](https://github.com/cognitivegears/depgate/tree/feature/wrappers)
+
 ### Gradual Migration
 
 UNPM supports gradual migration from npm. Before running `unpm migrate`, npm and unpm work interchangeably:
@@ -128,6 +153,7 @@ Reviews trust policy, release age settings, lockfile status, allowlist entries, 
 
 - Node.js >= 18.0.0
 - pnpm installed (`npm install -g pnpm`)
+- Optional for proxy mode: DepGate build with `run --prepare` support
 
 ## Contributing
 

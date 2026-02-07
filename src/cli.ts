@@ -18,6 +18,22 @@ export function createCli(): Command {
     .option('-v, --verbose', 'Enable verbose output')
     .option('-q, --quiet', 'Suppress output')
     .option('--strict', 'Enable strict security mode for CI environments')
+    .option(
+      '--depgate',
+      'Run install, ci, add, and update through a DepGate ephemeral proxy'
+    )
+    .option('--depgate-bin <path>', 'Path to depgate binary')
+    .option('--depgate-config <path>', 'Path to DepGate policy configuration')
+    .option(
+      '--depgate-decision-mode <mode>',
+      'DepGate decision mode (block, warn, or audit)'
+    )
+    .option(
+      '--depgate-upstream <arg>',
+      'Raw DepGate upstream override argument',
+      (value: string, previous: string[]) => [...previous, value],
+      []
+    )
     .hook('preAction', (thisCommand) => {
       const opts = thisCommand.opts();
       if (opts['verbose']) {
@@ -34,6 +50,23 @@ export function createCli(): Command {
     const opts = parent.opts();
     const args: string[] = [];
     if (opts['strict']) args.push('--strict');
+    if (opts['depgate']) args.push('--depgate');
+    if (typeof opts['depgateBin'] === 'string') {
+      args.push('--depgate-bin', opts['depgateBin']);
+    }
+    if (typeof opts['depgateConfig'] === 'string') {
+      args.push('--depgate-config', opts['depgateConfig']);
+    }
+    if (typeof opts['depgateDecisionMode'] === 'string') {
+      args.push('--depgate-decision-mode', opts['depgateDecisionMode']);
+    }
+    if (Array.isArray(opts['depgateUpstream'])) {
+      for (const arg of opts['depgateUpstream']) {
+        if (typeof arg === 'string') {
+          args.push('--depgate-upstream', arg);
+        }
+      }
+    }
     return args;
   };
 

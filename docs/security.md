@@ -154,6 +154,36 @@ UNPM_STRICT=true unpm install
 | Unreviewed build scripts | Warning | Fail |
 | Audit failures | Warning | Fail (if auditAfterInstall enabled) |
 
+## DepGate Ephemeral Proxy Mode
+
+UNPM can route install-family commands (`install`, `ci`, `add`, `update`) through a short-lived DepGate proxy without writing npm/pnpm registry config files.
+
+### Requirements
+
+Use a DepGate build that supports prepare mode:
+
+```bash
+depgate run --prepare --manager <manager> --log-level WARNING
+```
+
+At the time of writing, this is available from DepGate's wrappers work and newer releases that include it.
+Reference branch: [cognitivegears/depgate `feature/wrappers`](https://github.com/cognitivegears/depgate/tree/feature/wrappers).
+
+### Usage
+
+```bash
+unpm --depgate install
+unpm --depgate --depgate-config ./depgate-policy.yml --depgate-decision-mode warn add lodash
+```
+
+### Troubleshooting
+
+- `DepGate binary "... was not found"`: install DepGate and/or set `--depgate-bin`.
+- `Timed out waiting for DepGate prepare output`: verify your DepGate version supports `run --prepare`.
+- `DepGate prepare output was not valid JSON` or `missing proxy settings`: verify DepGate is running in prepare mode and no wrapper script is modifying stdout.
+- `DepGate exited before sending prepare output`: inspect DepGate stderr and verify policy/config values are valid.
+- `DepGate does not support manager "... in prepare mode"`: upgrade DepGate to a build with wrapper support for that manager.
+
 ### Strict Dep Builds
 
 In strict mode, installation fails if any packages have build scripts that are not in the allowlist:

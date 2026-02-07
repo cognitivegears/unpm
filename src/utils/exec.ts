@@ -1,4 +1,6 @@
 import { execa, type Options as ExecaOptions, type ResultPromise } from 'execa';
+import type { DepGateRuntimeOptions } from '../security/depgate.js';
+import { runWithDepGate } from './depgate.js';
 import { logger } from './logger.js';
 
 export interface ExecOptions {
@@ -6,6 +8,7 @@ export interface ExecOptions {
   env?: Record<string, string>;
   stdio?: 'inherit' | 'pipe';
   shell?: boolean;
+  depgate?: DepGateRuntimeOptions;
 }
 
 export interface ExecResult {
@@ -59,14 +62,31 @@ export async function execNpm(
 export function spawnPnpm(
   args: string[],
   options: ExecOptions = {}
-): ResultPromise {
+): Promise<ExecResult> {
   const cmd = `pnpm ${args.join(' ')}`;
   logger.command(cmd);
+
+  if (options.depgate) {
+    return runWithDepGate({
+      depgate: options.depgate,
+      manager: 'pnpm',
+      managerBin: 'pnpm',
+      managerArgs: args,
+      cwd: options.cwd ?? process.cwd(),
+      env: options.env,
+      stdio: options.stdio ?? 'inherit',
+      shell: options.shell,
+    });
+  }
 
   return execa('pnpm', args, {
     ...buildExecaOptions(options),
     stdio: 'inherit',
-  });
+  }).then((result) => ({
+    stdout: typeof result.stdout === 'string' ? result.stdout : '',
+    stderr: typeof result.stderr === 'string' ? result.stderr : '',
+    exitCode: result.exitCode ?? 0,
+  }));
 }
 
 /**
@@ -93,14 +113,31 @@ export function spawnPnpmWithEnv(
 export function spawnNpm(
   args: string[],
   options: ExecOptions = {}
-): ResultPromise {
+): Promise<ExecResult> {
   const cmd = `npm ${args.join(' ')}`;
   logger.command(cmd);
+
+  if (options.depgate) {
+    return runWithDepGate({
+      depgate: options.depgate,
+      manager: 'npm',
+      managerBin: 'npm',
+      managerArgs: args,
+      cwd: options.cwd ?? process.cwd(),
+      env: options.env,
+      stdio: options.stdio ?? 'inherit',
+      shell: options.shell,
+    });
+  }
 
   return execa('npm', args, {
     ...buildExecaOptions(options),
     stdio: 'inherit',
-  });
+  }).then((result) => ({
+    stdout: typeof result.stdout === 'string' ? result.stdout : '',
+    stderr: typeof result.stderr === 'string' ? result.stderr : '',
+    exitCode: result.exitCode ?? 0,
+  }));
 }
 
 /**

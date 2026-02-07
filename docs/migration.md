@@ -105,6 +105,13 @@ For enhanced security in CI, use strict mode:
 - unpm test
 ```
 
+If you also use DepGate policy enforcement in CI:
+
+```yaml
+- UNPM_STRICT=true unpm --depgate ci
+- unpm test
+```
+
 Or with the CLI flag:
 
 ```yaml
