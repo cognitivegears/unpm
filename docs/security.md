@@ -184,6 +184,10 @@ unpm --depgate --depgate-config ./depgate-policy.yml --depgate-decision-mode war
 - `DepGate exited before sending prepare output`: inspect DepGate stderr and verify policy/config values are valid.
 - `DepGate does not support manager "... in prepare mode"`: upgrade DepGate to a build with wrapper support for that manager.
 
+### Trust Model
+
+The `--depgate-bin` flag (or `depgate.binaryPath` config) specifies the DepGate binary that UNPM will execute. This binary controls the ephemeral proxy and provides environment variables and arguments that are applied to the package manager child process. Only use a DepGate binary you trust — a compromised binary could set arbitrary environment variables (e.g., `NODE_OPTIONS`) on the package manager process.
+
 ### Strict Dep Builds
 
 In strict mode, installation fails if any packages have build scripts that are not in the allowlist:

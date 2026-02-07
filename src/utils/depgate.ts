@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { execa } from 'execa';
 import type { DepGateRuntimeOptions } from '../security/depgate.js';
+import { logger } from './logger.js';
 
 const STDERR_TAIL_LIMIT = 4000;
 const TEARDOWN_GRACE_MS = 500;
@@ -327,6 +328,10 @@ function buildDepGateArgs(manager: string, depgate: DepGateRuntimeOptions): stri
 export async function runWithDepGate(
   options: RunWithDepGateOptions
 ): Promise<DepGateCommandResult> {
+  logger.info(
+    `Routing ${options.manager} through DepGate proxy (${options.depgate.binaryPath})`
+  );
+
   let depgateStderrTail = '';
   const depgateProcess = spawn(
     options.depgate.binaryPath,
@@ -359,6 +364,12 @@ export async function runWithDepGate(
     );
 
     const wrapper = preparePayload.wrapper;
+    if (!wrapper) {
+      logger.warn(
+        `DepGate proxy is running but did not provide wrapper config for ${options.manager}. ` +
+          `The package manager will not route through the proxy.`
+      );
+    }
     const managerArgs = buildManagerArgs(options.managerArgs, wrapper);
     const managerEnv = {
       ...process.env,

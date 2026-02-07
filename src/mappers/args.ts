@@ -125,7 +125,7 @@ export const unpmOnlyFlags = new Set([
   '--depgate-upstream',
 ]);
 
-function isUpstreamOverrideFlag(flagName: string): boolean {
+export function isUpstreamOverrideFlag(flagName: string): boolean {
   return flagName === '--upstream' || flagName.startsWith('--upstream-');
 }
 

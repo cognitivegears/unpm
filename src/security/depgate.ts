@@ -1,4 +1,8 @@
-import { hasFlag, getFlagValue } from '../mappers/args.js';
+import {
+  hasFlag,
+  getFlagValue,
+  isUpstreamOverrideFlag,
+} from '../mappers/args.js';
 import { getUnpmConfig, type DepGateConfig } from '../utils/config.js';
 
 export type DepGateDecisionMode = 'block' | 'warn' | 'audit';
@@ -12,10 +16,6 @@ export interface DepGateRuntimeOptions {
 }
 
 const DECISION_MODES = new Set<DepGateDecisionMode>(['block', 'warn', 'audit']);
-
-function isUpstreamOverrideFlag(flagName: string): boolean {
-  return flagName === '--upstream' || flagName.startsWith('--upstream-');
-}
 
 function hasDepGateCliOption(args: string[]): boolean {
   return args.some((arg) => {
@@ -34,7 +34,11 @@ function hasDepGateCliOption(args: string[]): boolean {
   });
 }
 
-function collectFlagValues(args: string[], flag: string): string[] {
+function collectFlagValues(
+  args: string[],
+  flag: string,
+  allowDashValues = false
+): string[] {
   const values: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -43,7 +47,7 @@ function collectFlagValues(args: string[], flag: string): string[] {
 
     if (arg === flag) {
       const nextArg = args[i + 1];
-      if (nextArg && !nextArg.startsWith('-')) {
+      if (nextArg && (allowDashValues || !nextArg.startsWith('-'))) {
         values.push(nextArg);
         i++;
       }
@@ -116,13 +120,14 @@ export async function resolveDepGateRuntimeOptions(
   cwd?: string
 ): Promise<DepGateRuntimeOptions | undefined> {
   const config = (await getUnpmConfig(cwd)).depgate;
-  const cliUpstreamArgs = collectFlagValues(args, '--depgate-upstream');
+  const cliUpstreamArgs = collectFlagValues(args, '--depgate-upstream', true);
   const rawUpstreamArgs = extractUpstreamOverrideArgs(args);
 
   const enabled =
     hasFlag(args, '--depgate') ||
     config?.enabled === true ||
     hasDepGateCliOption(args) ||
+    cliUpstreamArgs.length > 0 ||
     rawUpstreamArgs.length > 0;
 
   if (!enabled) {
@@ -137,9 +142,11 @@ export async function resolveDepGateRuntimeOptions(
   );
 
   const passthroughArgs = [
-    ...getConfigUpstreamOverrides(config),
-    ...cliUpstreamArgs,
-    ...rawUpstreamArgs,
+    ...new Set([
+      ...getConfigUpstreamOverrides(config),
+      ...cliUpstreamArgs,
+      ...rawUpstreamArgs,
+    ]),
   ];
 
   return {

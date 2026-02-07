@@ -1,4 +1,4 @@
-import { execa, type Options as ExecaOptions, type ResultPromise } from 'execa';
+import { execa, type Options as ExecaOptions } from 'execa';
 import type { DepGateRuntimeOptions } from '../security/depgate.js';
 import { runWithDepGate } from './depgate.js';
 import { logger } from './logger.js';
@@ -97,7 +97,7 @@ export function spawnPnpmWithEnv(
   args: string[],
   envVars: Record<string, string>,
   options: ExecOptions = {}
-): ResultPromise {
+): Promise<ExecResult> {
   const cmd = `pnpm ${args.join(' ')}`;
   logger.command(cmd);
 
@@ -107,7 +107,11 @@ export function spawnPnpmWithEnv(
       env: { ...options.env, ...envVars },
     }),
     stdio: 'inherit',
-  });
+  }).then((result) => ({
+    stdout: typeof result.stdout === 'string' ? result.stdout : '',
+    stderr: typeof result.stderr === 'string' ? result.stderr : '',
+    exitCode: result.exitCode ?? 0,
+  }));
 }
 
 export function spawnNpm(
