@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execa } from 'execa';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import { mkdtemp, writeFile, rm, mkdir, readFile } from 'node:fs/promises';
+import { dirname, join, delimiter } from 'node:path';
+import { mkdtemp, writeFile, rm, mkdir, readFile, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -686,5 +686,194 @@ describe('CLI Lockfile Warnings', () => {
     expect(result.exitCode).toBe(1);
 
     await rm(tempDir, { recursive: true, force: true });
+  });
+});
+
+describe('CLI DepGate Integration', () => {
+  let tempDir: string;
+  let binDir: string;
+
+  beforeAll(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'unpm-depgate-integration-'));
+    binDir = join(tempDir, 'bin');
+    await mkdir(binDir, { recursive: true });
+
+    await writeFile(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'depgate-test',
+        version: '1.0.0',
+        unpm: {
+          migrated: true,
+        },
+      })
+    );
+
+    await writeFile(
+      join(binDir, 'pnpm'),
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const outPath = process.env.UNPM_TEST_PNPM_ARGS_FILE;
+if (outPath) {
+  fs.writeFileSync(outPath, JSON.stringify({
+    args: process.argv.slice(2),
+    registry: process.env.npm_config_registry || null,
+    marker: process.env.UNPM_TEST_WRAPPER_MARKER || null
+  }));
+}
+process.exit(Number(process.env.UNPM_TEST_PNPM_EXIT_CODE || '0'));
+`,
+      { mode: 0o755 }
+    );
+
+    await writeFile(
+      join(binDir, 'depgate'),
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const argsPath = process.env.UNPM_TEST_DEPGATE_ARGS_FILE;
+if (argsPath) {
+  fs.writeFileSync(argsPath, JSON.stringify(process.argv.slice(2)));
+}
+const payload = {
+  mode: 'prepare',
+  proxy: {
+    host: '127.0.0.1',
+    port: 59937,
+    url: 'http://127.0.0.1:59937',
+    health_url: 'http://127.0.0.1:59937/_depgate/health'
+  },
+  manager: {
+    requested: 'pnpm',
+    supported: true
+  },
+  wrapper: {
+    env_vars: {
+      npm_config_registry: 'http://127.0.0.1:59937',
+      UNPM_TEST_WRAPPER_MARKER: 'wrapped'
+    },
+    extra_args: ['--from-depgate'],
+    extra_args_position: 'after_manager',
+    temp_files: [],
+    registry_type: 'npm'
+  }
+};
+process.stdout.write(JSON.stringify(payload) + '\\n');
+process.stdin.resume();
+process.stdin.on('end', () => {
+  const teardownPath = process.env.UNPM_TEST_DEPGATE_TEARDOWN_FILE;
+  if (teardownPath) {
+    fs.writeFileSync(teardownPath, 'closed');
+  }
+  process.exit(0);
+});
+setInterval(() => {}, 1000);
+`,
+      { mode: 0o755 }
+    );
+  });
+
+  afterAll(async () => {
+    if (tempDir) {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should route install through DepGate prepare wrapper', async () => {
+    const policyPath = join(tempDir, 'depgate-policy.yml');
+    const depgateArgsPath = join(tempDir, 'depgate-args.json');
+    const pnpmArgsPath = join(tempDir, 'pnpm-args.json');
+    const teardownPath = join(tempDir, 'depgate-teardown.txt');
+
+    await writeFile(policyPath, 'version: 1\n');
+
+    const result = await execa(
+      'node',
+      [
+        cliPath,
+        '--depgate',
+        '--depgate-config',
+        policyPath,
+        '--depgate-decision-mode',
+        'warn',
+        '--depgate-upstream=--upstream-npm=https://registry.npmjs.org',
+        'install',
+        'left-pad',
+      ],
+      {
+        reject: false,
+        cwd: tempDir,
+        env: {
+          PATH: `${binDir}${delimiter}${process.env['PATH'] ?? ''}`,
+          UNPM_TEST_DEPGATE_ARGS_FILE: depgateArgsPath,
+          UNPM_TEST_PNPM_ARGS_FILE: pnpmArgsPath,
+          UNPM_TEST_DEPGATE_TEARDOWN_FILE: teardownPath,
+        },
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    const depgateArgs = JSON.parse(
+      await readFile(depgateArgsPath, 'utf-8')
+    ) as string[];
+    expect(depgateArgs).toEqual(
+      expect.arrayContaining([
+        'run',
+        '--prepare',
+        '--manager',
+        'pnpm',
+        '--log-level',
+        'WARNING',
+        '--config',
+        policyPath,
+        '--decision-mode',
+        'warn',
+        '--upstream-npm=https://registry.npmjs.org',
+      ])
+    );
+
+    const pnpmCall = JSON.parse(await readFile(pnpmArgsPath, 'utf-8')) as {
+      args: string[];
+      registry: string | null;
+      marker: string | null;
+    };
+    expect(pnpmCall.args[0]).toBe('--from-depgate');
+    expect(pnpmCall.args).toContain('install');
+    expect(pnpmCall.args).toContain('left-pad');
+    expect(pnpmCall.registry).toBe('http://127.0.0.1:59937');
+    expect(pnpmCall.marker).toBe('wrapped');
+
+    const teardownSignal = await readFile(teardownPath, 'utf-8');
+    expect(teardownSignal.trim()).toBe('closed');
+  });
+
+  it('should not invoke DepGate for remove command', async () => {
+    const depgateArgsPath = join(tempDir, 'depgate-args-remove.json');
+    const pnpmArgsPath = join(tempDir, 'pnpm-args-remove.json');
+    const teardownPath = join(tempDir, 'depgate-teardown-remove.txt');
+
+    const result = await execa(
+      'node',
+      [cliPath, '--depgate', 'remove', 'left-pad'],
+      {
+        reject: false,
+        cwd: tempDir,
+        env: {
+          PATH: `${binDir}${delimiter}${process.env['PATH'] ?? ''}`,
+          UNPM_TEST_DEPGATE_ARGS_FILE: depgateArgsPath,
+          UNPM_TEST_PNPM_ARGS_FILE: pnpmArgsPath,
+          UNPM_TEST_DEPGATE_TEARDOWN_FILE: teardownPath,
+        },
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    const pnpmCall = JSON.parse(await readFile(pnpmArgsPath, 'utf-8')) as {
+      args: string[];
+    };
+    expect(pnpmCall.args).toEqual(['remove', 'left-pad']);
+    await expect(access(depgateArgsPath)).rejects.toThrow();
+    await expect(access(teardownPath)).rejects.toThrow();
   });
 });

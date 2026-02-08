@@ -37,6 +37,20 @@ UNPM supports all npm commands. This is a complete reference.
 | `--no-trust-policy` | Disable trust policy |
 | `--block-exotic-subdeps` | Block git/tarball subdependencies |
 | `--no-block-exotic-subdeps` | Allow git/tarball subdependencies |
+| `--depgate` | Run install command through DepGate prepare proxy |
+| `--depgate-bin=<path>` | Use a specific DepGate binary |
+| `--depgate-config=<path>` | Pass policy file to DepGate (`--config`) |
+| `--depgate-decision-mode=<mode>` | Pass decision mode to DepGate (`block`, `warn`, `audit`) |
+| `--depgate-upstream=<arg>` | Pass raw upstream override args to DepGate |
+
+### DepGate Proxy Mode
+
+DepGate mode is available for install-family commands (`install`, `ci`, `add`, `update`) and uses a short-lived proxy process for the single command.
+
+```bash
+unpm --depgate install
+unpm --depgate --depgate-config ./depgate-policy.yml --depgate-decision-mode warn add lodash
+```
 
 ## Run Commands
 

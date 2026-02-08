@@ -86,6 +86,10 @@ const flagsWithValues = new Set([
   '--min-release-age',
   '--minimum-release-age',
   '--allow-recent',
+  '--depgate-bin',
+  '--depgate-config',
+  '--depgate-decision-mode',
+  '--depgate-upstream',
 ]);
 
 /**
@@ -113,7 +117,17 @@ export const unpmOnlyFlags = new Set([
   // Audit flags
   '--audit-after-install',
   '--no-audit-after-install',
+  // DepGate flags
+  '--depgate',
+  '--depgate-bin',
+  '--depgate-config',
+  '--depgate-decision-mode',
+  '--depgate-upstream',
 ]);
+
+export function isUpstreamOverrideFlag(flagName: string): boolean {
+  return flagName === '--upstream' || flagName.startsWith('--upstream-');
+}
 
 /**
  * Check if a flag is unpm-specific and should not be passed to pnpm/npm.
@@ -125,6 +139,9 @@ export function isUnpmOnlyFlag(flag: string): boolean {
   }
   // Check flags with values (e.g., --min-release-age=2d)
   const flagName = flag.split('=')[0];
+  if (flagName && isUpstreamOverrideFlag(flagName)) {
+    return true;
+  }
   if (flagName && unpmOnlyFlags.has(flagName)) {
     return true;
   }
@@ -142,7 +159,11 @@ export function removeUnpmOnlyFlags(args: string[]): string[] {
 
     if (isUnpmOnlyFlag(arg)) {
       // Skip this flag and its value if applicable
-      if (!arg.includes('=') && flagsWithValues.has(arg.split('=')[0] ?? '')) {
+      if (
+        !arg.includes('=') &&
+        (flagsWithValues.has(arg.split('=')[0] ?? '') ||
+          isUpstreamOverrideFlag(arg.split('=')[0] ?? ''))
+      ) {
         // Skip next arg if it's a value
         if (args[i + 1] && !args[i + 1]?.startsWith('-')) {
           i++;
@@ -220,9 +241,10 @@ export function extractPackagesFromArgs(args: string[]): {
 
     if (arg.startsWith('-')) {
       flags.push(arg);
+      const flagName = arg.split('=')[0] ?? '';
       if (
         !arg.includes('=') &&
-        flagsWithValues.has(arg) &&
+        (flagsWithValues.has(arg) || isUpstreamOverrideFlag(flagName)) &&
         args[i + 1] &&
         !args[i + 1]?.startsWith('-')
       ) {

@@ -17,6 +17,40 @@ corepack enable
 corepack prepare pnpm@latest --activate
 ```
 
+## DepGate proxy issues
+
+### "DepGate binary ... was not found"
+
+Install DepGate and make sure `depgate` is on your PATH, or set the binary explicitly:
+
+```bash
+unpm --depgate --depgate-bin /path/to/depgate install
+```
+
+### "Timed out waiting for DepGate prepare output"
+
+Your DepGate build likely does not support prepare mode yet, or startup is blocked. Validate this command works directly:
+
+```bash
+depgate run --prepare --manager pnpm --log-level WARNING
+```
+
+### "DepGate prepare output was not valid JSON" or "missing proxy settings"
+
+DepGate must write a single prepare JSON object as the first stdout line. Check for wrappers or shell scripts that print extra stdout before DepGate starts.
+
+### "DepGate exited before sending prepare output"
+
+This usually indicates a DepGate startup/config error. Re-run with DepGate directly and inspect stderr:
+
+```bash
+depgate run --prepare --manager pnpm --log-level WARNING --config ./depgate-policy.yml
+```
+
+### "DepGate does not support manager ... in prepare mode"
+
+Upgrade DepGate to a version/build that includes wrapper support for the requested manager.
+
 ## Package fails to build
 
 Some packages require running install scripts. Add them to the allowlist:

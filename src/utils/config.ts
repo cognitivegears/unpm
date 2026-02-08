@@ -17,6 +17,14 @@ export interface LavamoatConfig {
   allowScripts?: Record<string, boolean>;
 }
 
+export interface DepGateConfig {
+  enabled?: boolean;
+  binaryPath?: string;
+  configPath?: string;
+  decisionMode?: 'block' | 'warn' | 'audit';
+  upstreamOverrides?: string[];
+}
+
 export interface UnpmConfig {
   allowLocalScripts: boolean;
   allowDependencyScripts: boolean;
@@ -32,6 +40,8 @@ export interface UnpmConfig {
   // Audit settings
   auditAfterInstall?: boolean;
   auditLevel?: 'low' | 'moderate' | 'high' | 'critical';
+  // DepGate proxy settings
+  depgate?: DepGateConfig;
 }
 
 const defaultConfig: UnpmConfig = {

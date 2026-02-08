@@ -4,6 +4,7 @@ import {
   mapNpmFlagsToPnpm,
   mapNpmCiToPnpm,
   extractPackagesFromArgs,
+  removeUnpmOnlyFlags,
 } from '../mappers/args.js';
 import {
   runLocalScripts,
@@ -38,6 +39,7 @@ import {
   cleanupTempLockfile,
   getCompatibilityFlags,
 } from '../security/lockfile-sync.js';
+import { resolveDepGateRuntimeOptions } from '../security/depgate.js';
 import { logger } from '../utils/logger.js';
 import {
   runPostInstallAudit,
@@ -113,14 +115,8 @@ async function handleScriptFlags(
  * Remove unpm-only flags from the args before passing to pnpm.
  */
 function removeUnpmFlags(args: string[]): string[] {
-  return args.filter(
-    (arg) =>
-      arg !== '--force-scripts' &&
-      arg !== '--ignore-scripts=false' &&
-      arg !== '--no-ignore-scripts' &&
-      arg !== '--strict' &&
-      arg !== '--allow-dlx' &&
-      arg !== '--allow-explore'
+  return removeUnpmOnlyFlags(args).filter(
+    (arg) => arg !== '--ignore-scripts=false' && arg !== '--no-ignore-scripts'
   );
 }
 
@@ -277,7 +273,8 @@ export async function install(
     ...securityConfig.exoticSubdepsConfig.flags,
     ...getCompatibilityFlags(mode),
   ];
-  const result = await spawnPnpm(pnpmArgs);
+  const depgateOptions = await resolveDepGateRuntimeOptions(allArgs);
+  const result = await spawnPnpm(pnpmArgs, { depgate: depgateOptions });
 
   if (result.exitCode !== 0) {
     if (mode.mode === 'pre-migration') {
@@ -442,7 +439,8 @@ export async function ci(
     ...securityConfig.exoticSubdepsConfig.flags,
     ...getCompatibilityFlags(mode),
   ];
-  const result = await spawnPnpm(pnpmArgs);
+  const depgateOptions = await resolveDepGateRuntimeOptions(allArgs);
+  const result = await spawnPnpm(pnpmArgs, { depgate: depgateOptions });
 
   if (result.exitCode !== 0) {
     if (mode.mode === 'pre-migration') {
@@ -587,7 +585,8 @@ export async function add(
     ...securityConfig.exoticSubdepsConfig.flags,
     ...getCompatibilityFlags(mode),
   ];
-  const result = await spawnPnpm(pnpmArgs);
+  const depgateOptions = await resolveDepGateRuntimeOptions(allArgs);
+  const result = await spawnPnpm(pnpmArgs, { depgate: depgateOptions });
 
   if (result.exitCode !== 0) {
     if (mode.mode === 'pre-migration') {
@@ -721,7 +720,8 @@ export async function update(
     ...securityConfig.exoticSubdepsConfig.flags,
     ...getCompatibilityFlags(mode),
   ];
-  const result = await spawnPnpm(pnpmArgs);
+  const depgateOptions = await resolveDepGateRuntimeOptions(allArgs);
+  const result = await spawnPnpm(pnpmArgs, { depgate: depgateOptions });
 
   if (result.exitCode !== 0) {
     if (mode.mode === 'pre-migration') {

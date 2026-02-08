@@ -20,6 +20,13 @@ Add configuration to your `package.json`:
     "blockExoticSubdeps": false,
     "auditAfterInstall": false,
     "auditLevel": "high",
+    "depgate": {
+      "enabled": false,
+      "binaryPath": "depgate",
+      "configPath": "./depgate-policy.yml",
+      "decisionMode": "warn",
+      "upstreamOverrides": ["--upstream-npm=https://registry.npmjs.org"]
+    },
     "strict": {
       "enabled": false,
       "minReleaseAgeDays": 7,
@@ -51,6 +58,11 @@ Add configuration to your `package.json`:
 | `blockExoticSubdeps` | `false` | Block git/tarball subdependencies |
 | `auditAfterInstall` | `false` | Run security audit after install |
 | `auditLevel` | `"high"` | Audit level: `"low"`, `"moderate"`, `"high"`, `"critical"` |
+| `depgate.enabled` | `false` | Enable DepGate ephemeral proxy mode for install commands |
+| `depgate.binaryPath` | `"depgate"` | DepGate binary path |
+| `depgate.configPath` | `undefined` | Value passed to DepGate `--config` |
+| `depgate.decisionMode` | `undefined` | Value passed to DepGate `--decision-mode` (`block`, `warn`, `audit`) |
+| `depgate.upstreamOverrides` | `[]` | Extra DepGate args for upstream override flags |
 | `strict.enabled` | `false` | Enable strict security mode |
 | `strict.minReleaseAgeDays` | `7` | Minimum release age in strict mode (days) |
 | `strict.strictDepBuilds` | `true` | Fail if unreviewed build scripts in strict mode |
@@ -62,6 +74,16 @@ Add configuration to your `package.json`:
 | Variable | Description |
 |----------|-------------|
 | `UNPM_STRICT` | Set to `true` to enable strict mode |
+
+## DepGate CLI Flags
+
+These can be used per-command without changing project configuration:
+
+```bash
+unpm --depgate install
+unpm --depgate --depgate-config ./depgate-policy.yml --depgate-decision-mode warn install
+unpm --depgate --depgate-upstream=--upstream-npm=https://registry.npmjs.org install
+```
 
 ## LavaMoat Allowlist
 
